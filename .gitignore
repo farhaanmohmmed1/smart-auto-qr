@@ -1,0 +1,103 @@
+# 🔐 Environment variables (SECRETS!)
+.env
+.env.local
+.env.*.local
+.env.production
+.env.production.local
+
+# 📦 Dependencies
+vendor/
+node_modules/
+composer.lock
+
+# 🏗️ Build artifacts & temporary files
+/tmp/
+/build/
+/dist/
+/out/
+
+# 💾 Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ⌨️  IDE & Editor Settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*~
+.sublime-project
+.sublime-workspace
+.project
+.pydevproject
+.settings/
+*.iml
+
+# 📋 IDE temporary files
+.prettierrc
+.editorconfig
+
+# 📝 Log Files
+*.log
+logs/
+*.log.*
+
+# 🗄️  Database Backups & SQL Files
+*.sql
+*.sql.bak
+*.sql.gz
+/backups/
+/backup/
+*.backup
+
+# 📂 Generated Files (QR codes, uploads - created on-demand)
+qrcodes/
+uploads/
+generated/
+cache/
+temp/
+
+# 🧪 Testing & Coverage
+.phpunit.cache
+.phpunit.result.cache
+coverage/
+.coverage
+htmlcov/
+
+# 🏃 Local Development Files
+.local.php
+docker-compose.override.yml
+.env.test
+.env.dusk.local
+
+# 📦 PHP specific
+.php_cs.cache
+.phplint-cache
+
+# 🔨 Build & Vercel specific
+.vercel/
+.vercel/output/
+out/
+
+# 📦 Archive Files
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# 🚫 Never commit these files
+config/secrets.php
+config/private-keys.pem
+config/certificate.pem
+
+# ✅ Actually DO commit these core files (uncomment if needed)
+# !vendor/.gitkeep
+# !uploads/.gitkeep
+# !qrcodes/.gitkeep

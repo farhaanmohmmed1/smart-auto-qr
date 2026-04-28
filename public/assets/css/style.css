@@ -1,0 +1,427 @@
+/* ============================================================
+   Smart Auto QR Safety System — Public Scan Page Styles
+   Mobile-first, government-grade design
+   ============================================================ */
+
+:root {
+  --primary:     #1a237e;
+  --primary-l:   #3949ab;
+  --accent:      #2196f3;
+  --sos:         #d32f2f;
+  --sos-light:   #ff5252;
+  --success:     #1b5e20;
+  --success-l:   #43a047;
+  --call:        #00695c;
+  --call-l:      #00897b;
+  --bg:          #0d1117;
+  --bg2:         #111827;
+  --card:        #161b22;
+  --card2:       #1c2333;
+  --border:      rgba(255,255,255,0.08);
+  --border2:     rgba(255,255,255,0.13);
+  --text:        #e6edf3;
+  --muted:       #7d8590;
+  --white:       #ffffff;
+}
+
+/* ── Reset & Base ─────────────────────────────────────────── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); text-decoration: none; }
+
+/* ── Page Shell ───────────────────────────────────────────── */
+.page {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 0 0 40px 0;
+  min-height: 100vh;
+}
+
+/* ── Header Bar ───────────────────────────────────────────── */
+.header-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: var(--primary);
+  background: linear-gradient(135deg, #0d1b6e 0%, #1a237e 50%, #283593 100%);
+  border-bottom: 3px solid #ffd600;
+}
+
+.header-logo {
+  font-size: 1.6rem;
+  width: 40px;
+  text-align: center;
+}
+
+.header-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--white);
+  letter-spacing: 0.3px;
+}
+
+.header-sub {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.7);
+  margin-top: 1px;
+}
+
+.verified-dot {
+  margin-left: auto;
+  width: 10px; height: 10px;
+  background: #69f0ae;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #69f0ae;
+  animation: blink 1.8s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity:1; }
+  50%       { opacity:0.3; }
+}
+
+/* ── Auto Number Card ─────────────────────────────────────── */
+.auto-number-card {
+  background: linear-gradient(135deg, #0d1b6e, #1a237e 60%, #1565c0);
+  padding: 24px 20px 20px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.auto-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.55);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.auto-number {
+  font-size: 2.4rem;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 3px;
+  line-height: 1;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+
+.reg-number {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.6);
+  margin-top: 6px;
+  font-family: monospace;
+  letter-spacing: 1px;
+}
+
+/* ── Driver Card ──────────────────────────────────────────── */
+.driver-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: var(--card2);
+  border-bottom: 1px solid var(--border);
+}
+
+.driver-avatar {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--primary-l));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+  border: 3px solid rgba(255,255,255,0.15);
+}
+
+.driver-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--white);
+  margin-bottom: 5px;
+}
+
+.driver-badge {
+  display: inline-block;
+  background: rgba(76,175,80,0.15);
+  border: 1px solid rgba(76,175,80,0.3);
+  color: #81c784;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+/* ── Details Grid ─────────────────────────────────────────── */
+.details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-item {
+  background: var(--card);
+  padding: 16px 18px;
+}
+
+.detail-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 5px;
+}
+
+.detail-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+}
+
+/* ── Buttons ──────────────────────────────────────────────── */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 16px 20px;
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  border-radius: 0;
+  transition: filter 0.15s, transform 0.1s;
+  text-decoration: none;
+  letter-spacing: 0.3px;
+}
+.btn:active { transform: scale(0.98); filter: brightness(0.92); }
+
+.btn-call {
+  background: linear-gradient(135deg, #00695c, #00897b);
+  color: #fff;
+  margin-bottom: 0;
+  font-size: 1.1rem;
+}
+
+.btn-sos {
+  background: linear-gradient(135deg, #b71c1c, #d32f2f, #f44336);
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 12px 20px;
+  font-size: 0.9rem;
+}
+
+/* ── SOS Section ──────────────────────────────────────────── */
+.sos-section {
+  padding: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.btn-sos {
+  padding: 22px 20px;
+  box-shadow: 0 4px 20px rgba(211,47,47,0.4);
+}
+
+.sos-hint {
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--muted);
+  padding: 8px 20px;
+  background: rgba(211,47,47,0.05);
+}
+
+/* ── Safety Tips ──────────────────────────────────────────── */
+.safety-card {
+  margin: 16px;
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.safety-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.safety-items { display: flex; flex-direction: column; gap: 8px; }
+
+.safety-item {
+  font-size: 0.85rem;
+  color: var(--muted);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.safety-item:last-child { border-bottom: none; }
+
+/* ── Footer ───────────────────────────────────────────────── */
+.footer {
+  text-align: center;
+  padding: 24px 20px;
+}
+
+.footer-helpline {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.footer-helpline a { color: var(--accent); font-weight: 700; }
+
+.footer-note {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.25);
+}
+
+/* ── Error Page ───────────────────────────────────────────── */
+.error-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.error-wrap {
+  text-align: center;
+  max-width: 360px;
+}
+
+.error-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+}
+
+.error-wrap h1 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.error-wrap p {
+  font-size: 0.9rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.sos-notice {
+  margin-top: 20px;
+  padding: 14px;
+  background: rgba(211,47,47,0.1);
+  border: 1px solid rgba(211,47,47,0.3);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: #ef9a9a;
+}
+
+/* ── SOS Overlay ──────────────────────────────────────────── */
+.sos-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.sos-overlay.hidden { display: none; }
+
+.sos-modal {
+  background: var(--card);
+  border: 1px solid rgba(211,47,47,0.3);
+  border-radius: 20px;
+  padding: 32px 24px;
+  width: 100%;
+  max-width: 380px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(211,47,47,0.2);
+}
+
+.sos-modal-icon { font-size: 3rem; margin-bottom: 16px; }
+.sos-modal h2   { font-size: 1.3rem; font-weight: 800; margin-bottom: 12px; }
+
+#sosStatusText {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.sos-progress {
+  height: 3px;
+  background: linear-gradient(90deg, var(--sos), var(--sos-light));
+  border-radius: 2px;
+  margin: 0 0 20px;
+  animation: progress 2s infinite;
+  background-size: 200% 100%;
+}
+
+@keyframes progress {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* ── Responsive / Desktop ─────────────────────────────────── */
+@media (min-width: 500px) {
+  .page {
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    margin-top: 20px;
+    margin-bottom: 20px;
+    border-radius: 20px;
+    overflow: hidden;
+    min-height: auto;
+  }
+
+  .header-bar    { border-radius: 20px 20px 0 0; }
+  .btn-call      { border-radius: 0; }
+  .sos-section   { /* keep flat on mobile sections */ }
+
+  body { display: flex; justify-content: center; padding: 20px; background: #080c12; }
+}
+
+/* ── Print ────────────────────────────────────────────────── */
+@media print {
+  body { background: #fff; color: #000; }
+  .sos-section, .btn-call, .safety-card { display: none; }
+  .auto-number-card { background: #1a237e !important; -webkit-print-color-adjust: exact; }
+}

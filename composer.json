@@ -1,0 +1,41 @@
+{
+  "name": "smart-auto-qr/safety-system",
+  "description": "Government-grade auto-rickshaw safety & tracking system with local QR generation",
+  "type": "project",
+  "license": "proprietary",
+  "authors": [
+    {
+      "name": "Smart Auto QR Team",
+      "email": "admin@smartautoqur.local"
+    }
+  ],
+  "require": {
+    "php": ">=8.0",
+    "endroid/qr-code": "^2.10"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "": "lib/"
+    }
+  },
+  "scripts": {
+    "test-qr": "php bin/test_qr.php",
+    "post-install-cmd": [
+      "@php -r \"echo 'Smart Auto QR installed successfully.\\n';\""
+    ]
+  },
+  "repositories": [
+    {
+      "type": "composer",
+      "url": "https://repo.packagist.org"
+    }
+  ],
+  "config": {
+    "platform": {
+      "php": "8.0"
+    }
+  }
+}
