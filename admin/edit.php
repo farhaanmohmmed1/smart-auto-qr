@@ -4,7 +4,6 @@ require_once '../lib/QRGenerator.php';
 requireAdmin();
 
 $id   = (int)($_GET['id'] ?? 0);
-$auto = $id ? $pdo->prepare("SELECT * FROM autos WHERE id=?")->execute([$id]) ? null : null : null;
 $stmt = $pdo->prepare("SELECT * FROM autos WHERE id=?");
 $stmt->execute([$id]);
 $auto = $stmt->fetch();
@@ -14,6 +13,7 @@ if (!$auto) {
 }
 
 $success = $error = '';
+$qrLocked = $auto['qr_locked'] ?? 0;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $reg_number     = strtoupper(trim($_POST['reg_number']    ?? ''));
@@ -41,12 +41,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             WHERE id=?");
         $stmt->execute([$reg_number, $driver_name, $phone, $license_number, $permit_number, $area, $stand, $status, $id]);
 
-        // Re-generate QR if driver name changed
-        QRGenerator::delete($auto['auto_number']);
-        $autoUrl = generateAutoURL($auto['auto_number']);
-        $qrPath  = QRGenerator::generate($autoUrl, $auto['auto_number']);
-        if ($qrPath) {
-            $pdo->prepare("UPDATE autos SET qr_path=? WHERE id=?")->execute([$qrPath, $id]);
+        // QR CODE CONSISTENCY: Only regenerate if QR is NOT locked
+        // Once locked, QR code NEVER changes (ensures sticker consistency)
+        if (!$qrLocked) {
+            $qrPath = QRGenerator::generate($auto['auto_number']);
+            if ($qrPath) {
+                $pdo->prepare("UPDATE autos SET qr_path=? WHERE id=?")->execute([$qrPath, $id]);
+            }
         }
 
         redirect("manage.php?flash=updated");
@@ -72,10 +73,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="page-header">
       <div>
         <h1 class="page-title">Edit Auto — <?= e($auto['auto_number']) ?></h1>
-        <p class="page-sub">Modify auto and driver details. QR code will be regenerated.</p>
+        <p class="page-sub">Modify auto and driver details. QR code consistency is protected.</p>
       </div>
       <a href="manage.php" class="btn btn-outline">← Back</a>
     </div>
+
+    <?php if ($qrLocked): ?>
+    <div class="alert alert-info">
+      🔒 <strong>QR Code Locked:</strong> This auto's QR code was assigned on <?= date('M d, Y H:i', strtotime($auto['qr_assigned_at'])) ?> and is now locked for consistency.
+      The QR code will never change, ensuring sticker validity in the field.
+    </div>
+    <?php endif; ?>
 
     <?php if ($error):   ?><div class="alert alert-danger">⚠️ <?= $error ?></div><?php endif; ?>
     <?php if ($success): ?><div class="alert alert-success">✅ <?= $success ?></div><?php endif; ?>
@@ -140,7 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="card">
           <div class="card-header"><h2 class="card-title">QR Code</h2></div>
           <div class="card-body" style="text-align:center;">
-            <?php $qrUrl = QRGenerator::getQRImageURL($auto['auto_number']); ?>
+            <?php $qrUrl = QRGenerator::getURL($auto['auto_number']); ?>
             <img src="<?= e($qrUrl) ?>" alt="QR" style="width:160px;height:160px;border-radius:8px;border:2px solid var(--border);">
             <div style="margin-top:12px;font-size:0.78rem;color:var(--muted);word-break:break-all;">
               <?= e(generateAutoURL($auto['auto_number'])) ?>

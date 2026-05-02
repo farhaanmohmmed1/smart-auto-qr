@@ -1,5 +1,9 @@
 <?php
 require_once '../config/config.php';
+
+// Debug: Log session info
+error_log("DASHBOARD ACCESS - Session ID: " . session_id() . ", admin_id=" . ($_SESSION['admin_id'] ?? 'NOT SET') . ", admin_user=" . ($_SESSION['admin_user'] ?? 'NOT SET'));
+
 requireAdmin();
 
 // ── Stats ────────────────────────────────────────────────────

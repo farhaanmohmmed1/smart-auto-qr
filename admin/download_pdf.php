@@ -15,11 +15,25 @@ if (!$auto) {
 }
 
 // Get QR as base64 for embedding in PDF
-$autoUrl  = generateAutoURL($auto['auto_number']);
-$qrPath   = QRGenerator::generate($autoUrl, $auto['auto_number'], 400);
-$qrBase64 = $qrPath && file_exists($qrPath)
-    ? 'data:image/png;base64,' . base64_encode(file_get_contents($qrPath))
-    : 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=' . urlencode($autoUrl);
+$qrUrl = QRGenerator::generate($auto['auto_number'], 400);
+
+if (!$qrUrl) {
+    http_response_code(500);
+    exit('Failed to generate QR code.');
+}
+
+// Fetch QR image from API and convert to base64
+try {
+    $qrImage = @file_get_contents($qrUrl, false, stream_context_create([
+        'http' => ['timeout' => 10]
+    ]));
+    
+    $qrBase64 = $qrImage !== false 
+        ? 'data:image/png;base64,' . base64_encode($qrImage)
+        : $qrUrl;  // Fallback to URL if fetch fails
+} catch (Exception $e) {
+    $qrBase64 = $qrUrl;  // Fallback to URL if exception
+}
 
 PDFGenerator::renderPrintPage($auto, $qrBase64);
 exit;

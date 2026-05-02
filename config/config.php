@@ -1,4 +1,9 @@
 <?php
+// ── Start Session (MUST be before any output) ──────────────
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 /**
  * Smart Auto QR Safety System - Vercel Configuration
  * Environment-based configuration for serverless deployment
@@ -277,24 +282,59 @@ function redirect(string $url): void {
  * Check if user is authenticated (for legacy compatibility)
  */
 function isAdmin(): bool {
-    // JWT auth preferred, but keep for backward compatibility
-    return false;
+    // Check session variables set by login.php
+    return isset($_SESSION['admin_id']) && !empty($_SESSION['admin_id']);
 }
 
 /**
  * Require admin authentication (use JWTAuth::requireAuth() instead in new code)
  */
 function requireAdmin(): void {
-    // Legacy function - use JWTAuth::requireAuth() instead
-    error('Authentication required', 401);
+    if (!isAdmin()) {
+        http_response_code(401);
+        redirect('../admin/login.php?msg=timeout');
+    }
 }
 
 /**
- * Generate QR code URL from auto number
+ * Generate public view URL from auto number (token-based security)
+ * 
+ * SECURITY: Uses secure token instead of auto_number in URL
+ * Prevents users from guessing/changing URL to access other autos
  */
 function generateAutoURL(string $autoNumber): string {
-    $base = FRONTEND_URL;
-    return rtrim($base, '/') . '/auto/' . urlencode($autoNumber);
+    global $pdo;
+    
+    // Get the qr_token for this auto
+    try {
+        $stmt = $pdo->prepare("SELECT qr_token FROM autos WHERE auto_number = ? LIMIT 1");
+        $stmt->execute([$autoNumber]);
+        $result = $stmt->fetch();
+        
+        if ($result && !empty($result['qr_token'])) {
+            $token = $result['qr_token'];
+        } else {
+            // Generate new token if not exists
+            $token = bin2hex(random_bytes(32));
+            // Try to update, ignore if fails (auto might not exist yet)
+            $upd = $pdo->prepare("UPDATE autos SET qr_token = ? WHERE auto_number = ? AND qr_token IS NULL");
+            $upd->execute([$token, $autoNumber]);
+        }
+    } catch (Exception $e) {
+        // Fallback: generate token
+        $token = bin2hex(random_bytes(32));
+    }
+    
+    // Build URL using current server's protocol and host
+    $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http';
+    $host     = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    
+    // Detect if we're in a subdirectory (XAMPP development)
+    $scriptPath = $_SERVER['SCRIPT_NAME'] ?? '';
+    $basePath   = dirname(dirname($scriptPath)); // Remove /config/config.php → /smart_auto_qr
+    
+    // Build the public view URL with secure token
+    return "{$protocol}://{$host}{$basePath}/public/auto.php?token=" . urlencode($token);
 }
 
 /**

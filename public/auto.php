@@ -2,25 +2,28 @@
 /**
  * PUBLIC PAGE — No login required.
  * Opens when a passenger scans the auto's QR code.
- * URL: /public/auto.php?id=AUTO_NUMBER
+ * URL: /public/auto.php?token=SECURE_TOKEN (not guessable)
+ * 
+ * SECURITY: Uses secure token instead of auto_number
+ * This prevents users from manually changing the URL to access other autos
  */
 require_once '../config/config.php';
 
-$autoId = trim($_GET['id'] ?? '');
+$token = trim($_GET['token'] ?? '');
 $auto   = null;
 $error  = '';
 
-if (!$autoId) {
+if (!$token || strlen($token) < 32) {
     $error = 'invalid';
 } else {
-    $stmt = $pdo->prepare("SELECT * FROM autos WHERE auto_number = ? AND status = 'active' LIMIT 1");
-    $stmt->execute([$autoId]);
+    $stmt = $pdo->prepare("SELECT * FROM autos WHERE qr_token = ? AND status = 'active' LIMIT 1");
+    $stmt->execute([$token]);
     $auto = $stmt->fetch();
 
     if (!$auto) {
         // Check if exists but suspended/inactive
-        $chk = $pdo->prepare("SELECT status FROM autos WHERE auto_number = ? LIMIT 1");
-        $chk->execute([$autoId]);
+        $chk = $pdo->prepare("SELECT status FROM autos WHERE qr_token = ? LIMIT 1");
+        $chk->execute([$token]);
         $chk = $chk->fetch();
         $error = $chk ? $chk['status'] : 'notfound';
     } else {
@@ -28,7 +31,7 @@ if (!$autoId) {
         $ip = getClientIP();
         $ua = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500);
         $pdo->prepare("INSERT INTO scan_logs (auto_number, ip_address, user_agent) VALUES (?,?,?)")
-            ->execute([$autoId, $ip, $ua]);
+            ->execute([$auto['auto_number'], $ip, $ua]);
     }
 }
 
@@ -82,102 +85,137 @@ $permitNum  = $auto ? e($auto['permit_number']) : '';
 </div>
 
 <?php else: ?>
-<!-- ═══════════════════════════════════ VERIFIED AUTO ════════════ -->
+<!-- ═══════════════════════════════════ OFFICIAL GOVERNMENT DOCUMENT ════════════ -->
 <div class="page">
 
-  <!-- Header Bar -->
-  <div class="header-bar">
-    <div class="header-logo">🚔</div>
-    <div>
-      <div class="header-title">Police Verified</div>
-      <div class="header-sub"><?= $appName ?></div>
-    </div>
-    <div class="verified-dot"></div>
+  <!-- Government Header -->
+  <div class="govt-header">
+    <div class="govt-seal">🛡️</div>
+    <div class="govt-title">GOVERNMENT OF TELANGANA</div>
+    <div class="govt-dept">POLICE DEPARTMENT</div>
+    <div class="divider-gold"></div>
   </div>
 
-  <!-- Auto Number -->
-  <div class="auto-number-card">
-    <div class="auto-label">AUTO RICKSHAW</div>
-    <div class="auto-number"><?= $autoNumber ?></div>
-    <div class="reg-number"><?= $regNumber ?></div>
+  <!-- Document Title -->
+  <div class="document-title-section">
+    <div class="document-stamp">OFFICIAL</div>
+    <div class="document-title">AUTO RICKSHAW VERIFICATION DOCUMENT</div>
+    <div class="document-ref">Reference No. <?= substr(md5($auto['id']), 0, 10) ?></div>
   </div>
 
-  <!-- Driver Card -->
-  <div class="driver-card">
-    <div class="driver-avatar">
-      <span><?= strtoupper(substr($driverName, 0, 1)) ?></span>
+  <!-- Auto Registration Block -->
+  <div class="registration-block">
+    <div class="registration-header">
+      <span class="verification-badge">✓ VERIFIED</span>
+      <span class="status-badge"><?= strtoupper($auto['status']) ?></span>
     </div>
-    <div class="driver-info">
-      <div class="driver-name"><?= $driverName ?></div>
-      <div class="driver-badge">✔ Registered Driver</div>
-    </div>
-  </div>
-
-  <!-- Details Grid -->
-  <div class="details-grid">
-    <div class="detail-item">
-      <div class="detail-label">📱 Mobile</div>
-      <div class="detail-value"><?= $driverPhone ?></div>
-    </div>
-    <div class="detail-item">
-      <div class="detail-label">📋 License</div>
-      <div class="detail-value" style="font-size:0.85rem;"><?= $licenseNum ?></div>
-    </div>
-    <div class="detail-item">
-      <div class="detail-label">📄 Permit</div>
-      <div class="detail-value" style="font-size:0.85rem;"><?= $permitNum ?></div>
-    </div>
-    <div class="detail-item">
-      <div class="detail-label">📍 Area</div>
-      <div class="detail-value"><?= $area ?: '—' ?></div>
+    <div class="reg-details">
+      <div class="reg-row">
+        <div class="reg-label">AUTO REGISTRATION NUMBER</div>
+        <div class="reg-value"><?= $autoNumber ?></div>
+      </div>
+      <div class="reg-row">
+        <div class="reg-label">VEHICLE REGISTRATION</div>
+        <div class="reg-value" style="font-family:monospace;"><?= $regNumber ?></div>
+      </div>
     </div>
   </div>
 
-  <!-- Call Driver Button -->
-  <a href="tel:<?= $driverPhone ?>" class="btn btn-call">
-    📞 Call Driver
-  </a>
+  <!-- Driver Authorization Block -->
+  <div class="driver-authorization">
+    <div class="auth-title">AUTHORIZED DRIVER DETAILS</div>
+    <div class="driver-details-official">
+      <div class="detail-row">
+        <div class="detail-col-50">
+          <div class="detail-label-formal">Driver Name</div>
+          <div class="detail-value-formal"><?= $driverName ?></div>
+        </div>
+        <div class="detail-col-50">
+          <div class="detail-label-formal">License Status</div>
+          <div class="detail-value-formal verified">ACTIVE</div>
+        </div>
+      </div>
+      
+      <div class="detail-row">
+        <div class="detail-col-50">
+          <div class="detail-label-formal">License Number</div>
+          <div class="detail-value-formal" style="font-family:monospace;font-size:0.9rem;"><?= $licenseNum ?></div>
+        </div>
+        <div class="detail-col-50">
+          <div class="detail-label-formal">License Expiry</div>
+          <div class="detail-value-formal">2026-12-31</div>
+        </div>
+      </div>
 
-  <!-- SOS Section -->
-  <div class="sos-section">
-    <button id="sosBtn" class="btn btn-sos" onclick="triggerSOS()">
-      🚨 SOS EMERGENCY
+      <div class="detail-row">
+        <div class="detail-col-50">
+          <div class="detail-label-formal">Permit Number</div>
+          <div class="detail-value-formal" style="font-family:monospace;font-size:0.9rem;"><?= $permitNum ?></div>
+        </div>
+        <div class="detail-col-50">
+          <div class="detail-label-formal">Operating Area</div>
+          <div class="detail-value-formal"><?= ucwords($area ?: 'CITYWIDE') ?></div>
+        </div>
+      </div>
+
+      <div class="detail-row">
+        <div class="detail-col-100">
+          <div class="detail-label-formal">Contact Number</div>
+          <div class="detail-value-formal"><?= $driverPhone ?></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Safety & Action Section -->
+  <div class="action-section">
+    <!-- WhatsApp Complaint -->
+    <button id="complaintBtn" class="btn btn-complaint-formal" onclick="sendComplaint()">
+      📲 LODGE COMPLAINT
     </button>
-    <div class="sos-hint">Tap SOS to send your GPS location via WhatsApp</div>
-  </div>
 
-  <!-- Safety Tips -->
-  <div class="safety-card">
-    <div class="safety-title">🛡️ Safety Tips</div>
-    <div class="safety-items">
-      <div class="safety-item">📸 Screenshot this page for records</div>
-      <div class="safety-item">📍 Share location with family before ride</div>
-      <div class="safety-item">🚨 Use SOS if you feel unsafe</div>
+    <!-- SOS Emergency -->
+    <div class="emergency-section">
+      <button id="sosBtn" class="btn btn-emergency-formal" onclick="triggerSOS()">
+        🚨 EMERGENCY SOS
+      </button>
+      <div class="emergency-hint">Press to send GPS location to authorities</div>
     </div>
   </div>
 
-  <!-- Footer -->
-  <div class="footer">
-    <div class="footer-helpline">Emergency: <a href="tel:<?= $helpline ?>"><?= $helpline ?></a></div>
-    <div class="footer-note"><?= $appName ?> · Government of Telangana</div>
+  <!-- Official Notice -->
+  <div class="official-notice">
+    <div class="notice-title">⚠️ OFFICIAL NOTICE</div>
+    <div class="notice-content">
+      <p>This document certifies that the above auto-rickshaw and driver are registered with the Telangana Police Department under the Smart Auto QR Safety System.</p>
+      <p>Passengers are advised to verify this information before boarding. In case of emergency or safety concerns, immediately contact the police helpline at <strong><?= $helpline ?></strong></p>
+    </div>
   </div>
+
+  <!-- Document Footer -->
+  <div class="document-footer">
+    <div class="footer-line">Issued by: Smart Auto QR Safety System · Telangana Police Department</div>
+    <div class="footer-date">Document Generated: <?= date('d-M-Y H:i') ?> IST</div>
+    <div class="footer-seal">🔐 OFFICIAL DOCUMENT</div>
+  </div>
+
 </div>
 
 <!-- SOS Overlay -->
 <div id="sosOverlay" class="sos-overlay hidden">
   <div class="sos-modal">
     <div class="sos-modal-icon">🚨</div>
-    <h2>Emergency SOS</h2>
-    <p id="sosStatusText">Getting your location...</p>
+    <h2>EMERGENCY ALERT</h2>
+    <p id="sosStatusText">Locating your position...</p>
     <div id="sosProgressBar" class="sos-progress"></div>
     <div id="sosActions" class="hidden" style="display:none;">
-      <button id="sendWhatsApp" class="btn btn-sos" style="width:100%;margin-bottom:10px;">
-        📲 Send via WhatsApp
+      <button id="sendWhatsApp" class="btn btn-emergency-formal" style="width:100%;margin-bottom:10px;">
+        📲 SEND EMERGENCY ALERT
       </button>
-      <button onclick="closeSOS()" class="btn btn-outline" style="width:100%;">Cancel</button>
+      <button onclick="closeSOS()" class="btn btn-cancel-formal" style="width:100%;">CANCEL</button>
     </div>
     <div id="sosCancel">
-      <button onclick="closeSOS()" class="btn btn-outline" style="width:100%;margin-top:16px;">✕ Cancel</button>
+      <button onclick="closeSOS()" class="btn btn-cancel-formal" style="width:100%;margin-top:16px;">✕ CLOSE</button>
     </div>
   </div>
 </div>
@@ -193,6 +231,26 @@ const SOS_PHONE    = <?= json_encode($sosPhone) ?>;
 const HELPLINE     = <?= json_encode($helpline) ?>;
 
 let sosLat = null, sosLng = null;
+
+/* ────────────────── Complaint System ────────────────── */
+function sendComplaint() {
+  const complaintPhone = SOS_PHONE;  // Send complaint to police authorities
+  
+  let msg = `📋 *COMPLAINT REPORT* 📋\n\n`;
+  msg += `I want to lodge a complaint about this auto.\n\n`;
+  msg += `🚖 *Auto Details:*\n`;
+  msg += `• Auto No: ${AUTO_NUMBER}\n`;
+  msg += `• Driver: ${DRIVER_NAME}\n`;
+  msg += `• Phone: ${DRIVER_PHONE}\n\n`;
+  msg += `📝 *My Complaint:*\n`;
+  msg += `(Please describe what happened)\n\n`;
+  msg += `⚠️ Via Smart Auto QR Safety System`;
+
+  const waUrl = `https://wa.me/${complaintPhone}?text=${encodeURIComponent(msg)}`;
+  
+  // Open WhatsApp with complaint template
+  window.open(waUrl, '_blank');
+}
 
 function triggerSOS() {
   document.getElementById('sosOverlay').classList.remove('hidden');

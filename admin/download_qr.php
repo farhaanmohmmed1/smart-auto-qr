@@ -14,19 +14,38 @@ if (!$auto) {
 }
 
 $autoNum = $auto['auto_number'];
-$autoUrl = generateAutoURL($autoNum);
-$path    = QRGenerator::generate($autoUrl, $autoNum, 400);
 
-if (!$path || !file_exists($path)) {
-    // Send browser to the API URL
-    $apiUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=' . urlencode($autoUrl) . '&margin=10';
-    header("Location: $apiUrl");
+// Generate QR code (returns API URL)
+$qrUrl = QRGenerator::generate($autoNum, 400, QRGenerator::FORMAT_PNG);
+
+if (!$qrUrl) {
+    http_response_code(500);
+    exit('Failed to generate QR code.');
+}
+
+// ── Stream QR image from API to user ──────────────────────
+// This allows direct download without relying on local file storage
+try {
+    $qrImage = @file_get_contents($qrUrl, false, stream_context_create([
+        'http' => ['timeout' => 10]
+    ]));
+    
+    if ($qrImage === false) {
+        // If API fails, redirect to API URL directly
+        header("Location: $qrUrl");
+        exit;
+    }
+    
+    $filename = 'QR_' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $autoNum) . '.png';
+    header('Content-Type: image/png');
+    header("Content-Disposition: attachment; filename=\"$filename\"");
+    header('Content-Length: ' . strlen($qrImage));
+    header('Cache-Control: private, no-cache, no-store, must-revalidate');
+    echo $qrImage;
+    exit;
+} catch (Exception $e) {
+    // Fallback: redirect to API
+    header("Location: $qrUrl");
     exit;
 }
 
-$filename = 'QR_' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $autoNum) . '.png';
-header('Content-Type: image/png');
-header("Content-Disposition: attachment; filename=\"$filename\"");
-header('Content-Length: ' . filesize($path));
-readfile($path);
-exit;

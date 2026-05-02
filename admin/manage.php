@@ -3,6 +3,24 @@ require_once '../config/config.php';
 require_once '../lib/QRGenerator.php';
 requireAdmin();
 
+// ── Handle QR Lock Request ───────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lock_qr_id'])) {
+    $lockId = (int)$_POST['lock_qr_id'];
+    
+    // Get the auto record
+    $stmt = $pdo->prepare("SELECT auto_number, qr_path, qr_locked FROM autos WHERE id = ?");
+    $stmt->execute([$lockId]);
+    $auto = $stmt->fetch();
+    
+    if ($auto && $auto['qr_path'] && !$auto['qr_locked']) {
+        // Lock the QR code
+        if (QRGenerator::lockQRCode($auto['auto_number'], $auto['qr_path'])) {
+            header('Location: manage.php?flash=qr_locked');
+            exit;
+        }
+    }
+}
+
 // ── Filters & Pagination ─────────────────────────────────────
 $search = trim($_GET['search'] ?? '');
 $status = $_GET['status'] ?? '';
@@ -43,6 +61,7 @@ $autos = $stmt->fetchAll();
 // Flash message from redirect
 $flash = $_GET['flash'] ?? '';
 
+
 // Areas for filter dropdown
 $areas = $pdo->query("SELECT DISTINCT area FROM autos WHERE area IS NOT NULL AND area != '' ORDER BY area")->fetchAll(PDO::FETCH_COLUMN);
 ?>
@@ -76,6 +95,8 @@ $areas = $pdo->query("SELECT DISTINCT area FROM autos WHERE area IS NOT NULL AND
     <div class="alert alert-success">✅ Auto deleted successfully.</div>
     <?php elseif ($flash === 'updated'): ?>
     <div class="alert alert-success">✅ Auto updated successfully.</div>
+    <?php elseif ($flash === 'qr_locked'): ?>
+    <div class="alert alert-success">🔒 QR code locked successfully! It will never change now.</div>
     <?php endif; ?>
 
     <!-- Search & Filter -->
@@ -133,20 +154,27 @@ $areas = $pdo->query("SELECT DISTINCT area FROM autos WHERE area IS NOT NULL AND
               <td><span class="pill pill-<?= $a['status'] ?>"><?= strtoupper($a['status']) ?></span></td>
               <td>
                 <?php
-                $qrUrl = QRGenerator::getQRImageURL($a['auto_number']);
+                $qrUrl = QRGenerator::getURL($a['auto_number']);
+                $qrLocked = $a['qr_locked'] ?? 0;
                 ?>
-                <div class="qr-preview">
+                <div class="qr-preview" style="position:relative;">
                   <a href="<?= e($qrUrl) ?>" target="_blank">
                     <img src="<?= e($qrUrl) ?>" alt="QR" loading="lazy">
                   </a>
+                  <?php if ($qrLocked): ?>
+                    <div style="position:absolute;top:4px;right:4px;background:#27ae60;color:white;padding:2px 6px;border-radius:3px;font-size:0.7rem;font-weight:bold;">🔒</div>
+                  <?php endif; ?>
                 </div>
               </td>
               <td>
-                <div class="btn-group" style="flex-wrap:wrap;">
+                <div class="btn-group" style="flex-wrap:wrap;font-size:0.75rem;">
                   <a href="view_auto.php?id=<?= $a['id'] ?>"   class="btn btn-xs btn-outline">👁</a>
                   <a href="edit.php?id=<?= $a['id'] ?>"        class="btn btn-xs btn-outline">✏️</a>
-                  <a href="download_pdf.php?id=<?= $a['id'] ?>" class="btn btn-xs btn-success" target="_blank">🖨 PDF</a>
-                  <a href="download_qr.php?id=<?= $a['id'] ?>" class="btn btn-xs btn-outline">⬇ QR</a>
+                  <a href="download_pdf.php?id=<?= $a['id'] ?>" class="btn btn-xs btn-success" target="_blank">🖨</a>
+                  <a href="download_qr.php?id=<?= $a['id'] ?>" class="btn btn-xs btn-outline">⬇</a>
+                  <?php if (!$qrLocked && $a['qr_path']): ?>
+                    <a href="#" class="btn btn-xs btn-primary" title="Lock QR code" onclick="lockQR(<?= $a['id'] ?>, '<?= e($a['auto_number']) ?>'); return false;">🔒</a>
+                  <?php endif; ?>
                   <button class="btn btn-xs btn-danger"
                           onclick="confirmDelete(<?= $a['id'] ?>, '<?= e($a['auto_number']) ?>')">🗑</button>
                 </div>
@@ -203,6 +231,17 @@ function confirmDelete(id, name) {
   document.getElementById('deleteId').value = id;
   document.getElementById('deleteAutoName').textContent = name;
   document.getElementById('deleteModal').style.display = 'flex';
+}
+
+function lockQR(id, autoName) {
+  if (confirm(`🔒 Lock QR code for ${autoName}?\n\nOnce locked, the QR code will never change, ensuring sticker validity.`)) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = window.location.href;
+    form.innerHTML = `<input type="hidden" name="lock_qr_id" value="${id}">`;
+    document.body.appendChild(form);
+    form.submit();
+  }
 }
 </script>
 <script src="assets/js/admin.js"></script>

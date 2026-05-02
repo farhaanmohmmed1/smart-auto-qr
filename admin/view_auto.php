@@ -29,7 +29,7 @@ $recentSOS = $pdo->prepare("SELECT * FROM sos_logs WHERE auto_number=? ORDER BY 
 $recentSOS->execute([$auto['auto_number']]);
 $recentSOS = $recentSOS->fetchAll();
 
-$qrUrl  = QRGenerator::getQRImageURL($auto['auto_number']);
+$qrUrl  = QRGenerator::getURL($auto['auto_number']);
 $autoURL = generateAutoURL($auto['auto_number']);
 ?>
 <!DOCTYPE html>

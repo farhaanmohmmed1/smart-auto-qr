@@ -251,10 +251,13 @@ class ImportHandler {
         
         // Insert record
         try {
+            // Generate secure token for QR code
+            $qrToken = bin2hex(random_bytes(32));
+            
             $stmt = $this->pdo->prepare("
                 INSERT INTO autos 
-                (auto_number, reg_number, driver_name, phone, license_number, permit_number, area, stand, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')
+                (auto_number, reg_number, driver_name, phone, license_number, permit_number, area, stand, qr_token, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
             ");
             
             $stmt->execute([
@@ -266,6 +269,7 @@ class ImportHandler {
                 $fields['permit_number'],
                 $fields['area'],
                 $fields['stand'],
+                $qrToken,
             ]);
             
             $autoId = $this->pdo->lastInsertId();

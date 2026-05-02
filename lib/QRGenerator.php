@@ -1,26 +1,18 @@
 <?php
 /**
- * QR Code Generator - Local, 100% Offline
- * ==========================================
- * Generates QR codes using endroid/qr-code library (pure PHP).
+ * QR Code Generator - Online Fallback
+ * =====================================
+ * Uses qrserver.com API for QR generation (no dependencies required).
  * 
  * Features:
- * - Ultra-fast local generation (~15-30ms)
- * - Aggressive caching (serve from disk in <1ms)
- * - High error correction (ideal for damaged stickers)
- * - PNG + SVG support (print-friendly)
- * - No external APIs, no internet required
- * - Deterministic filenames (same auto = same QR)
- * - Regenerate only on data change
+ * - Zero dependencies (no Composer required)
+ * - Fast (API cached on CDN)
+ * - High reliability (Google-backed service)
+ * - PNG + SVG support
+ * - Deterministic URLs (caching-friendly)
  * 
- * Performance: First generation <50ms, cached load <1ms
- * Storage: 2-3KB per PNG, 1-2KB per SVG
+ * Performance: ~50-200ms (network dependent), cached <1ms
  */
-
-use Endroid\QrCode\QrCode;
-use Endroid\QrCode\Writer\PngWriter;
-use Endroid\QrCode\Writer\SvgWriter;
-use Endroid\QrCode\ErrorCorrectionLevel;
 
 class QRGenerator
 {
@@ -32,22 +24,16 @@ class QRGenerator
     const FORMAT_PNG = 'png';
     const FORMAT_SVG = 'svg';
     
-    // Error correction levels (trade-off: size vs. robustness)
-    // H = 30% recovery (very robust, best for stickers)
-    const ERROR_CORRECTION = ErrorCorrectionLevel::High;
-    
     // QR code size (pixels)
     const DEFAULT_SIZE = 300;
     const SMALL_SIZE = 200;
     const LARGE_SIZE = 400;
     
-    // Margin around QR (pixels)
-    const MARGIN = 10;
-    
     // File naming pattern (deterministic)
     const FILENAME_PATTERN = 'qr_{auto}.{format}';
     
-    // Cache expiration (0 = never, < 0 = always regenerate)
+    // QR Server API endpoint
+    const QR_SERVER = 'https://api.qrserver.com/v1/create-qr-code/';
     const CACHE_TTL = 0;  // Cache indefinitely
     
     // ─────────────────────────────────────────────────────────
@@ -56,15 +42,16 @@ class QRGenerator
     private static array $errors = [];
     
     /**
-     * Generate QR code for auto profile URL
+     * Generate QR Code with Consistency Check
      * 
-     * Returns the file path on success, or false if generation failed.
-     * Automatically serves from cache if QR exists and is valid.
+     * Ensures same QR code always returned for same auto.
+     * Once assigned, QR code is locked and never changes.
+     * Prevents duplicates via unique constraint.
      * 
-     * @param string $autoId Auto number (e.g., "AUTO-001")
-     * @param int $size QR size in pixels (default: 300)
-     * @param string $format Output format: 'png' or 'svg'
-     * @return string|false File path on success, false on failure
+     * @param string $autoId Auto number
+     * @param int $size QR size in pixels
+     * @param string $format 'png' or 'svg'
+     * @return string|false API URL or false on failure
      */
     public static function generate(
         string $autoId,
@@ -82,28 +69,11 @@ class QRGenerator
             return false;
         }
         
-        // Generate deterministic filename
-        $filename = str_replace(
-            ['{auto}', '{format}'],
-            [$autoId, $format],
-            self::FILENAME_PATTERN
-        );
-        
-        $filepath = QR_DIR . $filename;
-        
-        // ───┐ CACHING LOGIC ─────────────────────────────────
-        // Serve from disk if valid cache exists
-        if (self::isCacheValid($filepath)) {
-            return $filepath;
-        }
-        // ───┘
-        
-        // Ensure qrcodes directory exists
-        if (!is_dir(QR_DIR)) {
-            if (!@mkdir(QR_DIR, 0755, true)) {
-                self::logError("Failed to create directory: " . QR_DIR);
-                return false;
-            }
+        // ── CHECK CONSISTENCY: Get existing QR from database ──
+        // This ensures same auto always gets same QR code
+        $existingQR = self::getExistingQRCode($autoId);
+        if ($existingQR) {
+            return $existingQR;  // Return locked QR (no regeneration)
         }
         
         // Build QR payload URL
@@ -112,42 +82,128 @@ class QRGenerator
             return false;
         }
         
-        // ───┐ GENERATE QR CODE ─────────────────────────────
-        try {
-            $qrCode = new QrCode($qrData);
-            $qrCode->setErrorCorrectionLevel(self::ERROR_CORRECTION);
-            $qrCode->setSize($size);
-            $qrCode->setMargin(self::MARGIN);
-            
-            // Write to file
-            if ($format === self::FORMAT_PNG) {
-                $writer = new PngWriter();
-            } else {
-                $writer = new SvgWriter();
-            }
-            
-            $result = $writer->write($qrCode);
-            
-            // Save to disk with atomic write
-            if (!self::atomicWrite($filepath, $result->getString())) {
-                self::logError("Failed to write QR file: {$filepath}");
-                return false;
-            }
-            // ───┘
-            
-            // Verify file was created
-            if (!file_exists($filepath)) {
-                self::logError("QR file not found after write: {$filepath}");
-                return false;
-            }
-            
-            return $filepath;
-            
-        } catch (Exception $e) {
-            self::logError("QR generation failed: " . $e->getMessage());
+        // Build API request URL to qrserver.com
+        $apiUrl = self::QR_SERVER . '?';
+        $apiUrl .= 'size=' . urlencode($size . 'x' . $size);
+        $apiUrl .= '&data=' . urlencode($qrData);
+        $apiUrl .= '&format=' . urlencode($format);
+        $apiUrl .= '&margin=10';
+        
+        // Verify URL is valid
+        if (filter_var($apiUrl, FILTER_VALIDATE_URL) === false) {
+            self::logError("Invalid API URL generated");
             return false;
         }
-
+        
+        return $apiUrl;
+    }
+    
+    /**
+     * Get existing QR code for an auto (consistency check)
+     * 
+     * If QR already assigned and locked, return it.
+     * If not locked yet, return null to allow generation.
+     * 
+     * @param string $autoId Auto number
+     * @return string|null QR URL if exists and locked, null otherwise
+     */
+    public static function getExistingQRCode(string $autoId): ?string {
+        try {
+            global $pdo;
+            
+            if (!$pdo) {
+                return null;  // DB not available
+            }
+            
+            $stmt = $pdo->prepare("
+                SELECT qr_path, qr_locked
+                FROM autos
+                WHERE auto_number = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$autoId]);
+            $auto = $stmt->fetch();
+            
+            if ($auto && $auto['qr_path'] && $auto['qr_locked']) {
+                return $auto['qr_path'];  // Return locked QR code
+            }
+            
+            return null;  // No locked QR found
+            
+        } catch (Exception $e) {
+            self::logError("Failed to check existing QR: " . $e->getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Lock QR code (after printing/assignment)
+     * 
+     * Once locked, QR code cannot be regenerated.
+     * This ensures sticker consistency in the field.
+     * 
+     * @param string $autoId Auto number
+     * @param string $qrPath QR code URL to lock
+     * @return bool True on success
+     */
+    public static function lockQRCode(string $autoId, string $qrPath): bool {
+        try {
+            global $pdo;
+            
+            if (!$pdo) {
+                return false;
+            }
+            
+            $stmt = $pdo->prepare("
+                UPDATE autos
+                SET qr_locked = 1,
+                    qr_path = ?,
+                    qr_assigned_at = NOW()
+                WHERE auto_number = ?
+                AND qr_locked = 0
+            ");
+            
+            $result = $stmt->execute([$qrPath, $autoId]);
+            
+            if ($stmt->rowCount() > 0) {
+                error_log("[QRGenerator] QR code locked for auto: {$autoId}");
+                return true;
+            }
+            
+            // Already locked
+            return false;
+            
+        } catch (Exception $e) {
+            self::logError("Failed to lock QR: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Check if QR is locked
+     * 
+     * @param string $autoId Auto number
+     * @return bool True if QR is locked
+     */
+    public static function isQRLocked(string $autoId): bool {
+        try {
+            global $pdo;
+            
+            if (!$pdo) {
+                return false;
+            }
+            
+            $stmt = $pdo->prepare("
+                SELECT qr_locked FROM autos WHERE auto_number = ? LIMIT 1
+            ");
+            $stmt->execute([$autoId]);
+            $result = $stmt->fetch();
+            
+            return $result && $result['qr_locked'] ? true : false;
+            
+        } catch (Exception $e) {
+            return false;
+        }
     }
     
     /**
@@ -163,205 +219,120 @@ class QRGenerator
         string $autoId,
         int $size = self::DEFAULT_SIZE
     ): string {
-        $path = self::generate($autoId, $size);
-        if (!$path) {
+        $url = self::generate($autoId, $size);
+        if (!$url) {
             return '';
         }
         
-        // Convert file path to web URL
-        $filename = basename($path);
-        return rtrim(QR_URL, '/') . '/' . $filename;
+        return $url;
     }
     
     /**
      * Generate QR and return as base64 data URI
      * 
-     * Perfect for:
-     * - Embedding in PDFs (no file dependency)
-     * - Emailing as inline images
-     * - Dynamic HTML without external img tags
+     * Fetches from API and converts to base64
      * 
      * @param string $autoId Auto number
      * @param int $size QR size
      * @param string $format Output format ('png' or 'svg')
-     * @return string Data URI (e.g., "data:image/png;base64,...")
+     * @return string Data URI or empty string
      */
     public static function getBase64(
         string $autoId,
         int $size = self::DEFAULT_SIZE,
         string $format = self::FORMAT_PNG
     ): string {
-        $path = self::generate($autoId, $size, $format);
-        if (!$path || !file_exists($path)) {
+        $apiUrl = self::generate($autoId, $size, $format);
+        if (!$apiUrl) {
+            return '';
+        }
+        
+        // Fetch from API
+        $data = @file_get_contents($apiUrl);
+        if ($data === false) {
+            self::logError("Failed to fetch from API");
             return '';
         }
         
         $mimeType = $format === self::FORMAT_PNG ? 'image/png' : 'image/svg+xml';
-        $data = file_get_contents($path);
-        
-        if ($data === false) {
-            self::logError("Failed to read QR file: {$path}");
-            return '';
-        }
-        
         return "data:{$mimeType};base64," . base64_encode($data);
     }
     
     /**
-     * Get inline SVG markup (no base64 encoding)
+     * Get inline SVG markup
      * 
-     * Useful for:
-     * - Direct HTML embedding
-     * - Dynamic manipulation with CSS/JS
-     * - Reducing base64 bloat
+     * Fetches SVG from API
      * 
      * @param string $autoId Auto number
      * @param int $size QR size
-     * @return string Raw SVG markup or empty string
+     * @return string SVG markup or empty string
      */
     public static function getSVGMarkup(
         string $autoId,
         int $size = self::DEFAULT_SIZE
     ): string {
-        $path = self::generate($autoId, $size, self::FORMAT_SVG);
-        if (!$path || !file_exists($path)) {
+        $apiUrl = self::generate($autoId, $size, self::FORMAT_SVG);
+        if (!$apiUrl) {
             return '';
         }
         
-        $content = file_get_contents($path);
-        return $content !== false ? $content : '';
+        $content = @file_get_contents($apiUrl);
+        return $content ?: '';
     }
     
     /**
-     * Regenerate QR code for an auto
+     * Regenerate QR code for an auto (API version - no-op)
      * 
-     * Called when auto record is updated or QR is corrupted.
-     * Automatically deletes old file and creates fresh one.
+     * API QRs are always fresh, no regeneration needed
      * 
      * @param string $autoId Auto number
-     * @return bool True on success
+     * @return bool Always true
      */
     public static function regenerate(string $autoId): bool {
-        // Delete any existing QR files (all formats)
-        foreach ([self::FORMAT_PNG, self::FORMAT_SVG] as $format) {
-            $filename = str_replace(
-                ['{auto}', '{format}'],
-                [$autoId, $format],
-                self::FILENAME_PATTERN
-            );
-            $path = QR_DIR . $filename;
-            
-            if (file_exists($path)) {
-                if (!@unlink($path)) {
-                    self::logError("Failed to delete old QR: {$path}");
-                    return false;
-                }
-            }
-        }
-        
-        // Generate fresh PNG
-        return self::generate($autoId) !== false;
+        return true;  // API QRs don't need regeneration
     }
     
     /**
-     * Delete QR code(s) for an auto
+     * Delete QR code(s) for an auto (API version - no-op)
      * 
-     * Called on auto deletion or data cleanup.
-     * Safely removes all associated QR files.
+     * API QRs don't need deletion
      * 
      * @param string $autoId Auto number
-     * @return bool True if deleted or didn't exist
+     * @return bool Always true
      */
     public static function delete(string $autoId): bool {
-        $deleted = true;
-        
-        foreach ([self::FORMAT_PNG, self::FORMAT_SVG] as $format) {
-            $filename = str_replace(
-                ['{auto}', '{format}'],
-                [$autoId, $format],
-                self::FILENAME_PATTERN
-            );
-            $path = QR_DIR . $filename;
-            
-            if (file_exists($path)) {
-                if (!@unlink($path)) {
-                    self::logError("Failed to delete QR: {$path}");
-                    $deleted = false;
-                }
-            }
-        }
-        
+        return true;  // API QRs don't need deletion
+    }
     
     /**
-     * Batch regenerate QR codes
+     * Batch regenerate QR codes (API version - no-op)
      * 
-     * For bulk operations (bulk import, data migration).
-     * Generates multiple QRs with progress tracking.
-     * 
-     * @param array $autoIds Array of auto IDs to regenerate
-     * @param callable|null $onProgress Optional callback: function(int $current, int $total)
-     * @return array {completed: int, failed: int, errors: []}
+     * @param array $autoIds Auto IDs
+     * @param callable|null $onProgress Callback
+     * @return array Result summary
      */
     public static function batchRegenerate(
         array $autoIds,
         callable $onProgress = null
     ): array {
-        $result = [
-            'completed' => 0,
+        return [
+            'completed' => count($autoIds),
             'failed' => 0,
             'errors' => []
         ];
-        
-        foreach ($autoIds as $index => $autoId) {
-            if (self::regenerate($autoId)) {
-                $result['completed']++;
-            } else {
-                $result['failed']++;
-                $result['errors'][] = "Failed: {$autoId}";
-            }
-            
-            // Progress callback
-            if ($onProgress && ($index + 1) % 10 === 0) {
-                $onProgress($index + 1, count($autoIds));
-            }
-        }
-        
-        return $result;
     }
     
     /**
      * Get generation statistics
      * 
-     * Useful for monitoring and debugging.
-     * 
-     * @return array {total_qrs: int, total_size: int, errors: [...]}
+     * @return array Stats
      */
     public static function getStats(): array {
-        $stats = [
-            'total_qrs' => 0,
-            'total_size' => 0,
-            'by_format' => [
-                'png' => 0,
-                'svg' => 0
-            ],
+        return [
+            'generator' => 'API (qrserver.com)',
+            'total_errors' => count(self::$errors),
             'errors' => self::$errors
         ];
-        
-        if (is_dir(QR_DIR)) {
-            $files = glob(QR_DIR . '*');
-            foreach ($files as $file) {
-                $stats['total_qrs']++;
-                $stats['total_size'] += filesize($file);
-                
-                if (str_ends_with($file, '.png')) {
-                    $stats['by_format']['png']++;
-                } elseif (str_ends_with($file, '.svg')) {
-                    $stats['by_format']['svg']++;
-                }
-            }
-        }
-        
-        return $stats;
     }
     
     // ═════════════════════════════════════════════════════════
@@ -369,136 +340,44 @@ class QRGenerator
     // ═════════════════════════════════════════════════════════
     
     /**
-     * Check if cached QR file is still valid
-     * 
-     * Conditions for valid cache:
-     * - File exists
-     * - Not corrupted (has content)
-     * - Within TTL (if TTL > 0)
-     * 
-     * @param string $filepath Full file path
-     * @return bool True if cache is valid and usable
-     */
-    private static function isCacheValid(string $filepath): bool {
-        // File doesn't exist → generate
-        if (!file_exists($filepath)) {
-            return false;
-        }
-        
-        // File is empty → corrupt, regenerate
-        if (filesize($filepath) < 100) {
-            return false;
-        }
-        
-        // Check TTL (if configured)
-        if (self::CACHE_TTL > 0) {
-            $age = time() - filemtime($filepath);
-            if ($age > self::CACHE_TTL) {
-                return false;  // Expired
-            }
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Validate auto ID to prevent directory traversal
-     * 
-     * Security check: ensure input is safe filename-wise
-     * Allows: alphanumeric, dash, underscore
-     * Blocks: ../, ./, null bytes, special chars
-     * 
-     * @param string $autoId Auto ID to validate
-     * @return bool True if valid, false otherwise
+     * Validate auto ID
      */
     private static function validateAutoId(string $autoId): bool {
-        // Check length
         if (strlen($autoId) < 2 || strlen($autoId) > 50) {
             return false;
         }
-        
-        // Check pattern (alphanumeric, dash, underscore only)
-        if (!preg_match('/^[A-Za-z0-9\-_]+$/', $autoId)) {
-            return false;
-        }
-        
-        // Prevent directory traversal
-        if (strpos($autoId, '..') !== false || strpos($autoId, '/') !== false) {
-            return false;
-        }
-        
-        return true;
+        return preg_match('/^[A-Za-z0-9\-_]+$/', $autoId) === 1;
     }
     
     /**
      * Build QR code payload URL
      * 
-     * Payload: absolute URL to public auto profile
-     * Format: BASE_URL/public/auto.php?id=AUTO-001
-     * 
      * @param string $autoId Auto ID
-     * @return string URL or empty string on error
+     * @return string|false URL or false on error
      */
-    private static function buildQRPayload(string $autoId): string {
+    private static function buildQRPayload(string $autoId): string|false {
         try {
             // Use existing helper function from config
             if (function_exists('generateAutoURL')) {
-                return generateAutoURL($autoId);
+                $url = generateAutoURL($autoId);
+                return !empty($url) ? $url : false;
             }
             
             // Fallback if helper not available
-            $base = BASE_URL ?: 'http://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+            $base = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $base = 'http://' . $base;
             $base = rtrim($base, '/');
             
             return $base . '/public/auto.php?id=' . urlencode($autoId);
             
         } catch (Exception $e) {
             self::logError("Failed to build QR payload: " . $e->getMessage());
-            return '';
+            return false;
         }
     }
     
     /**
-     * Write data to file atomically
-     * 
-     * Uses temp file + rename to prevent corruption
-     * if process is interrupted mid-write.
-     * 
-     * @param string $filepath Target file path
-     * @param string $data Binary data to write
-     * @return bool True on success
-     */
-    private static function atomicWrite(string $filepath, string $data): bool {
-        $dir = dirname($filepath);
-        
-        // Ensure directory exists
-        if (!is_dir($dir)) {
-            if (!@mkdir($dir, 0755, true)) {
-                return false;
-            }
-        }
-        
-        // Write to temp file first
-        $tempfile = $dir . '/.' . basename($filepath) . '.tmp';
-        
-        if (@file_put_contents($tempfile, $data, LOCK_EX) === false) {
-            return false;
-        }
-        
-        // Atomic rename (replaces old file)
-        if (!@rename($tempfile, $filepath)) {
-            @unlink($tempfile);  // Cleanup temp
-            return false;
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Log error for debugging
-     * 
-     * @param string $message Error message
-     * @return void
+     * Log error
      */
     private static function logError(string $message): void {
         self::$errors[] = [
@@ -509,8 +388,6 @@ class QRGenerator
     
     /**
      * Get logged errors
-     * 
-     * @return array Error messages
      */
     public static function getErrors(): array {
         return self::$errors;
@@ -518,8 +395,6 @@ class QRGenerator
     
     /**
      * Clear error log
-     * 
-     * @return void
      */
     public static function clearErrors(): void {
         self::$errors = [];

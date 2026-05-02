@@ -73,86 +73,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (empty($_FILES['import_file']['name'])) {
         $error = 'Please select a file to upload.';
     } else {
-        // Process the import
-        try {
-            $handler = new ImportHandler($pdo);
-            $importResults = $handler->importFile($_FILES['import_file']);
-            
-            if (!$importResults['success']) {
-                $error = $importResults['message'];
-            } else {
-                $success = "✅ Imported {$importResults['successful']} records successfully. ";
-                if ($importResults['skipped'] > 0) {
-                    $success .= "{$importResults['skipped']} skipped (duplicates). ";
-                }
-                if ($importResults['errors'] > 0) {
-                    $success .= "{$importResults['errors']} errors.";
-                }
-            }
-        } catch (Exception $e) {
-            $error = 'Import failed: ' . $e->getMessage();
-        }
-    }
-}
-?>
-
-$error = $error ?? '';
-$success = '';
-$importResults = null;
-
-// ── POST: Handle file upload ──────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['import_file']) && !$error) {
-    $importer = new ImportHandler($pdo, $_SESSION['admin_id']);
-    $importResults = $importer->importFile($_FILES['import_file']);
-    
-    if (!$importResults['success']) {
-        $error = $importResults['error'];
-    } else {
-        $success = $importResults['message'];
+        // Validate file format
+        $filename = $_FILES['import_file']['name'];
+        $fileExt = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        $allowedFormats = ['xlsx', 'xls', 'csv', 'txt'];
         
-        // Generate QR codes for newly imported autos (async would be better in production)
-        if ($importResults['successful'] > 0) {
-            $this->generateQRsForImport($importResults);
+        if (!in_array($fileExt, $allowedFormats)) {
+            $error = "❌ Invalid file format! Allowed formats: " . implode(', ', array_map(fn($f) => strtoupper($f), $allowedFormats));
+        } else {
+            // Process the import
+            try {
+                $adminId = $_SESSION['admin_id'] ?? null;
+                if (!$adminId) {
+                    $error = 'Admin session not found. Please login again.';
+                } else {
+                    $handler = new ImportHandler($pdo, $adminId);
+                    $importResults = $handler->importFile($_FILES['import_file']);
+                    
+                    if (!$importResults['success']) {
+                        $error = $importResults['message'];
+                    } else {
+                        $success = "✅ Imported {$importResults['successful']} records successfully. ";
+                        if ($importResults['skipped'] > 0) {
+                            $success .= "{$importResults['skipped']} skipped (duplicates). ";
+                        }
+                        if ($importResults['errors'] > 0) {
+                            $success .= "{$importResults['errors']} errors.";
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                $error = 'Import failed: ' . $e->getMessage();
+            }
         }
     }
 }
 
-/**
- * Generate QR codes for newly imported autos
- */
-function generateQRsForImport(&$results) {
-    global $pdo;
-    
-    $qrGenerated = 0;
-    $qrFailed = 0;
-    
-    // Get autos without QR codes (created in last 5 minutes)
-    $stmt = $pdo->query("
-        SELECT id, auto_number FROM autos 
-        WHERE qr_path IS NULL 
-        AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE)
-        LIMIT 1000
-    ");
-    
-    while ($auto = $stmt->fetch()) {
-        try {
-            $autoUrl = generateAutoURL($auto['auto_number']);
-            $qrPath = QRGenerator::generate($autoUrl, $auto['auto_number']);
-            
-            if ($qrPath) {
-                $pdo->prepare("UPDATE autos SET qr_path = ? WHERE id = ?")
-                    ->execute([$qrPath, $auto['id']]);
-                $qrGenerated++;
-            } else {
-                $qrFailed++;
-            }
-        } catch (Exception $e) {
-            $qrFailed++;
-        }
-    }
-    
-    error_log("QR Generation: $qrGenerated generated, $qrFailed failed");
-}
+// Get CSRF token for form
+$csrf_token = generateCSRFToken();
 
 ?>
 <!DOCTYPE html>
@@ -329,22 +287,13 @@ function generateQRsForImport(&$results) {
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken()) ?>">
           
           <div class="upload-section">
-            <!-- Excel Upload -->
-            <div class="upload-box" id="excelBox" onclick="document.getElementById('excelInput').click()">
-              <div class="upload-icon">📈</div>
-              <h3>Excel Files</h3>
-              <p>.xlsx, .xls</p>
+            <!-- Unified Upload -->
+            <div class="upload-box" id="uploadBox" onclick="document.getElementById('fileInput').click()" style="grid-column: 1 / -1;">
+              <div class="upload-icon">📊</div>
+              <h3>Import Auto Data</h3>
+              <p>.xlsx, .xls, .csv</p>
               <p style="font-size: 0.8rem; color: #8b949e; margin-top: 10px;">Click to browse or drag & drop</p>
-              <input type="file" id="excelInput" name="import_file" accept=".xlsx,.xls" style="display:none">
-            </div>
-            
-            <!-- CSV Upload -->
-            <div class="upload-box" id="csvBox" onclick="document.getElementById('csvInput').click()">
-              <div class="upload-icon">📄</div>
-              <h3>CSV / Google Sheets</h3>
-              <p>.csv (comma-separated)</p>
-              <p style="font-size: 0.8rem; color: #8b949e; margin-top: 10px;">Click to browse or drag & drop</p>
-              <input type="file" id="csvInput" name="import_file" accept=".csv,.txt" style="display:none">
+              <input type="file" id="fileInput" name="import_file" accept=".xlsx,.xls,.csv,.txt" style="display:none">
             </div>
           </div>
 
@@ -529,52 +478,57 @@ function generateQRsForImport(&$results) {
 
 <script>
 // Drag & Drop functionality
-setupDragDrop('excelBox', 'excelInput');
-setupDragDrop('csvBox', 'csvInput');
+const uploadBox = document.getElementById('uploadBox');
+const fileInput = document.getElementById('fileInput');
+const submitBtn = document.getElementById('submitBtn');
 
-function setupDragDrop(boxId, inputId) {
-  const box = document.getElementById(boxId);
-  const input = document.getElementById(inputId);
-  const submitBtn = document.getElementById('submitBtn');
+uploadBox.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  uploadBox.classList.add('dragover');
+});
+
+uploadBox.addEventListener('dragleave', () => {
+  uploadBox.classList.remove('dragover');
+});
+
+uploadBox.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadBox.classList.remove('dragover');
   
-  box.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    box.classList.add('dragover');
-  });
-  
-  box.addEventListener('dragleave', () => {
-    box.classList.remove('dragover');
-  });
-  
-  box.addEventListener('drop', (e) => {
-    e.preventDefault();
-    box.classList.remove('dragover');
-    
-    if (e.dataTransfer.files.length > 0) {
-      input.files = e.dataTransfer.files;
-      submitBtn.style.display = 'block';
-      box.style.borderColor = '#2da44e';
-      box.style.background = 'rgba(45,164,78,0.1)';
-    }
-  });
-  
-  input.addEventListener('change', () => {
-    if (input.files.length > 0) {
-      submitBtn.style.display = 'block';
-      box.style.borderColor = '#2da44e';
-      box.style.background = 'rgba(45,164,78,0.1)';
-    }
-  });
-}
+  if (e.dataTransfer.files.length > 0) {
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(e.dataTransfer.files[0]);
+    fileInput.files = dataTransfer.files;
+    submitBtn.style.display = 'block';
+    uploadBox.style.borderColor = '#2da44e';
+    uploadBox.style.background = 'rgba(45,164,78,0.1)';
+  }
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length > 0) {
+    submitBtn.style.display = 'block';
+    uploadBox.style.borderColor = '#2da44e';
+    uploadBox.style.background = 'rgba(45,164,78,0.1)';
+  }
+});
 
 // Form submission with validation
 document.getElementById('uploadForm').addEventListener('submit', function(e) {
-  const excelInput = document.getElementById('excelInput');
-  const csvInput = document.getElementById('csvInput');
-  
-  if (!excelInput.files.length && !csvInput.files.length) {
+  if (!fileInput.files.length) {
     e.preventDefault();
     alert('Please select a file to upload');
+    return false;
+  }
+  
+  // Validate file format on client side
+  const file = fileInput.files[0];
+  const allowedFormats = ['xlsx', 'xls', 'csv', 'txt'];
+  const fileExt = file.name.split('.').pop().toLowerCase();
+  
+  if (!allowedFormats.includes(fileExt)) {
+    e.preventDefault();
+    alert('❌ Invalid file format!\n\nAllowed formats: ' + allowedFormats.map(f => f.toUpperCase()).join(', ') + '\n\nYou selected: .' + fileExt);
     return false;
   }
 });

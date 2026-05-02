@@ -43,20 +43,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = implode('<br>', $errors);
         } else {
             try {
+                // Generate secure token for QR code
+                $qrToken = bin2hex(random_bytes(32));
+                
                 // Insert record
                 $stmt = $pdo->prepare("INSERT INTO autos 
-                    (auto_number, reg_number, driver_name, phone, license_number, permit_number, area, stand, status)
-                    VALUES (?,?,?,?,?,?,?,?,'active')");
-                $stmt->execute([$auto_number, $reg_number, $driver_name, $phone, $license_number, $permit_number, $area, $stand]);
+                    (auto_number, reg_number, driver_name, phone, license_number, permit_number, area, stand, qr_token, status)
+                    VALUES (?,?,?,?,?,?,?,?,?,'active')");
+                $stmt->execute([$auto_number, $reg_number, $driver_name, $phone, $license_number, $permit_number, $area, $stand, $qrToken]);
 
                 // Generate QR code
-                $autoUrl = generateAutoURL($auto_number);
-                $qrPath  = QRGenerator::generate($autoUrl, $auto_number);
+                $qrPath = QRGenerator::generate($auto_number);
+                
                 if ($qrPath) {
+                    // Update with QR path
                     $pdo->prepare("UPDATE autos SET qr_path=? WHERE auto_number=?")->execute([$qrPath, $auto_number]);
+                    
+                    // LOCK QR CODE: Once assigned, never regenerate
+                    QRGenerator::lockQRCode($auto_number, $qrPath);
+                    
+                    $success = "✅ Auto <strong>{$auto_number}</strong> registered! QR code generated and locked.";
+                } else {
+                    $success = "⚠️ Auto <strong>{$auto_number}</strong> registered, but QR generation failed.";
                 }
-
-                $success = "Auto <strong>{$auto_number}</strong> registered successfully! QR code generated.";
 
                 // Clear form
                 $auto_number = $reg_number = $driver_name = $phone = $license_number = $permit_number = $area = $stand = '';
