@@ -346,7 +346,8 @@ class QRGenerator
         if (strlen($autoId) < 2 || strlen($autoId) > 50) {
             return false;
         }
-        return preg_match('/^[A-Za-z0-9\-_]+$/', $autoId) === 1;
+        // Allow alphanumeric, hyphens, underscores, AND spaces for Indian auto registration format
+        return preg_match('/^[A-Za-z0-9\-_\s]+$/', $autoId) === 1;
     }
     
     /**
