@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lock_qr_id'])) {
 // ── Filters & Pagination ─────────────────────────────────────
 $search = trim($_GET['search'] ?? '');
 $status = $_GET['status'] ?? '';
-$area   = trim($_GET['area'] ?? '');
+$stand  = trim($_GET['stand'] ?? '');
 $page   = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 20;
 $offset  = ($page - 1) * $perPage;
@@ -40,9 +40,9 @@ if ($status) {
     $where[]  = "status = ?";
     $params[] = $status;
 }
-if ($area) {
-    $where[]  = "area LIKE ?";
-    $params[] = "%$area%";
+if ($stand) {
+    $where[]  = "stand = ?";
+    $params[] = $stand;
 }
 
 $whereStr = implode(' AND ', $where);
@@ -62,8 +62,8 @@ $autos = $stmt->fetchAll();
 $flash = $_GET['flash'] ?? '';
 
 
-// Areas for filter dropdown
-$areas = $pdo->query("SELECT DISTINCT area FROM autos WHERE area IS NOT NULL AND area != '' ORDER BY area")->fetchAll(PDO::FETCH_COLUMN);
+// Stands for filter dropdown
+$stands = $pdo->query("SELECT DISTINCT stand FROM autos WHERE stand IS NOT NULL AND stand != '' ORDER BY stand")->fetchAll(PDO::FETCH_COLUMN);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -108,10 +108,10 @@ $areas = $pdo->query("SELECT DISTINCT area FROM autos WHERE area IS NOT NULL AND
         <option value="inactive"  <?= $status==='inactive'  ?'selected':'' ?>>Inactive</option>
         <option value="suspended" <?= $status==='suspended' ?'selected':'' ?>>Suspended</option>
       </select>
-      <select name="area">
-        <option value="">All Areas</option>
-        <?php foreach ($areas as $a): ?>
-          <option value="<?= e($a) ?>" <?= $area===$a?'selected':'' ?>><?= e($a) ?></option>
+      <select name="stand">
+        <option value="">All Stands</option>
+        <?php foreach ($stands as $s): ?>
+          <option value="<?= e($s) ?>" <?= $stand===$s ? 'selected' : '' ?>><?= e($s) ?></option>
         <?php endforeach; ?>
       </select>
       <button type="submit" class="btn btn-primary">🔍 Search</button>
@@ -129,7 +129,7 @@ $areas = $pdo->query("SELECT DISTINCT area FROM autos WHERE area IS NOT NULL AND
               <th>Driver</th>
               <th>Phone</th>
               <th>Reg. No.</th>
-              <th>Area</th>
+              <th>Stand</th>
               <th>Safety</th>
               <th>Status</th>
               <th>QR</th>
@@ -148,10 +148,14 @@ $areas = $pdo->query("SELECT DISTINCT area FROM autos WHERE area IS NOT NULL AND
                 <div style="font-size:0.75rem;color:var(--muted);"><?= e($a['license_number']) ?></div>
               </td>
               <td>
-                <a href="tel:<?= e($a['phone']) ?>" style="color:var(--text);"><?= e($a['phone']) ?></a>
+                <?php if (!empty($a['phone'])): ?>
+                  <a href="tel:<?= e($a['phone']) ?>" style="color:var(--text);"><?= e($a['phone']) ?></a>
+                <?php else: ?>
+                  <span style="color:var(--muted);">—</span>
+                <?php endif; ?>
               </td>
-              <td><?= e($a['reg_number']) ?></td>
-              <td><?= e($a['area'] ?? '—') ?></td>
+              <td><?= !empty($a['reg_number']) ? e($a['reg_number']) : '<span style="color:var(--muted);">—</span>' ?></td>
+              <td><?= !empty($a['stand']) ? e($a['stand']) : '<span style="color:var(--muted);">—</span>' ?></td>
               <td>
                 <?php 
                   $badges = ['safe' => '✅ Safe', 'caution' => '⚠️ Caution', 'danger' => '🚫 Danger'];

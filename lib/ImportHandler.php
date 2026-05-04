@@ -19,15 +19,16 @@ class ImportHandler {
     
     // Column definition configuration
     private $columnDefinitions = [
-        'auto_number'    => ['required' => true, 'transform' => 'uppercase', 'aliases' => ['Auto Number', 'Auto#', 'Auto No']],
-        'reg_number'     => ['required' => false, 'transform' => 'uppercase', 'aliases' => ['Registration Number', 'Reg Number', 'Reg#', 'Vehicle Reg']],
-        'driver_name'    => ['required' => true, 'transform' => 'trim', 'aliases' => ['Driver Name', 'Driver', 'Driver\'s Name', 'Auto Owner', 'Auto Owner Name', 'Owner Name', 'Owner']],
-        'phone'          => ['required' => false, 'transform' => 'phone', 'aliases' => ['Phone Number', 'Phone', 'Mobile', 'Contact']],
-        'license_number' => ['required' => false, 'transform' => 'uppercase', 'aliases' => ['License Number', 'License#', 'DL', 'License']],
-        'permit_number'  => ['required' => false, 'transform' => 'uppercase', 'aliases' => ['Permit Number', 'Permit#', 'Permit']],
-        'area'           => ['required' => false, 'transform' => 'trim', 'aliases' => ['Area', 'Zone', 'Operating Area']],
-        'stand'          => ['required' => false, 'transform' => 'trim', 'aliases' => ['Stand', 'Stand Name', 'Depot', 'Stand Depot']],
-        'security_detail' => ['required' => false, 'transform' => 'lowercase', 'aliases' => ['Security', 'Security Detail', 'Safety Status', 'Security Status', 'Security Details', 'Security_Details', 'security_details']],
+        'auto_number'    => ['required' => true,  'transform' => 'uppercase',    'aliases' => ['Auto Number', 'Auto#', 'Auto No', 'Vehicle Number', 'Vehicle No', 'AUTO NUMBER']],
+        'reg_number'     => ['required' => false, 'transform' => 'uppercase',    'aliases' => ['Registration Number', 'Reg Number', 'Reg#', 'Vehicle Reg']],
+        'driver_name'    => ['required' => true,  'transform' => 'name_extract', 'aliases' => ['Driver Name', 'Driver', "Driver's Name", 'Auto Owner', 'Auto Owner Name', 'Owner Name', 'Owner', 'Auto Owner Name Address', 'Auto Owner Name & Address']],
+        'phone'          => ['required' => false, 'transform' => 'phone',        'aliases' => ['Phone Number', 'Phone', 'Mobile', 'Contact', 'Mobile Number', 'MOBILE NUMBER']],
+        'license_number' => ['required' => false, 'transform' => 'uppercase',    'aliases' => ['License Number', 'License#', 'DL', 'License', 'Driving License', 'DRIVING LICENSE', 'DL Number']],
+        'aadhar_number'  => ['required' => false, 'transform' => 'trim',         'aliases' => ['Aadhar Number', 'AADHAR NUMBER', 'Aadhar', 'Aadhaar', 'Aadhaar Number', 'Aadhaar No', 'Aadhar No']],
+        'permit_number'  => ['required' => false, 'transform' => 'uppercase',    'aliases' => ['Permit Number', 'Permit#', 'Permit']],
+        'area'           => ['required' => false, 'transform' => 'first_line',   'aliases' => ['Area', 'Zone', 'Operating Area', 'Place of the Auto Stand', 'Place of Auto Stand', 'Stand Location', 'Place of the Auto Stand Union Reg No']],
+        'stand'          => ['required' => false, 'transform' => 'trim',         'aliases' => ['Stand', 'Stand Name', 'Depot', 'Stand Depot', 'Name of the Union', 'NAME OF THE UNION', 'Union Name', 'Union']],
+        'security_detail' => ['required' => false, 'transform' => 'lowercase',   'aliases' => ['Security', 'Security Detail', 'Safety Status', 'Security Status', 'Security Details', 'Security_Details', 'security_details']],
     ];
     
     public function __construct($pdo, int $adminId) {
@@ -159,10 +160,11 @@ class ImportHandler {
     }
     
     /**
-     * Normalize header text for comparison
+     * Normalize header text for comparison — strips all non-alphanumeric chars so
+     * "AUTO OWNER NAME & ADDRESS" and "Auto Owner Name Address" both become "autoownernameaddress".
      */
     private function normalizeHeader(string $header): string {
-        return strtolower(trim(preg_replace('/[\s\-_#]+/', '', $header)));
+        return strtolower(preg_replace('/[^a-z0-9]+/i', '', $header));
     }
     
     /**
@@ -221,40 +223,73 @@ class ImportHandler {
     
     /**
      * Parse CSV file
-     * Returns array with headers and rows
+     * Returns array with headers and rows.
+     * Skips leading title rows (e.g. police/government CSV files that begin with
+     * a report heading before the actual column header row).
      */
     private function parseCSV(string $filePath): array {
-        $rows = [];
+        $rows    = [];
         $headers = [];
-        $isFirstRow = true;
-        
+        $headerFound = false;
+
         if (!is_readable($filePath)) {
             throw new Exception('Cannot read file');
         }
-        
+
         $handle = fopen($filePath, 'r');
-        
+
         while (($row = fgetcsv($handle, 0, ',')) !== false) {
             // Skip empty rows
             if (empty(array_filter($row))) {
                 continue;
             }
-            
-            // First non-empty row is header
-            if ($isFirstRow) {
-                $headers = $row;
-                $isFirstRow = false;
+
+            if (!$headerFound) {
+                // Accept this row as the header only if it looks like column names.
+                // Otherwise treat it as a title/metadata row and skip it.
+                if ($this->rowLooksLikeHeader($row)) {
+                    $headers     = $row;
+                    $headerFound = true;
+                }
             } else {
                 $rows[] = $row;
             }
         }
-        
+
         fclose($handle);
-        
+
         return [
             'headers' => $headers,
-            'rows' => $rows,
+            'rows'    => $rows,
         ];
+    }
+
+    /**
+     * Returns true if the row contains at least one cell that matches a known
+     * column alias AND has at least 3 non-empty cells (so a one-cell title
+     * like "RAJAMAHENDRAVARAM AUTO WORKERS UNIONS..." is always rejected).
+     */
+    private function rowLooksLikeHeader(array $row): bool {
+        $nonEmpty = array_filter($row, fn($c) => trim($c) !== '');
+        if (count($nonEmpty) < 3) {
+            return false;
+        }
+
+        foreach ($row as $cell) {
+            $normalized = $this->normalizeHeader(trim($cell));
+            foreach ($this->columnDefinitions as $fieldName => $config) {
+                if ($normalized === $this->normalizeHeader($fieldName)) {
+                    return true;
+                }
+                foreach ($config['aliases'] as $alias) {
+                    if ($normalized === $this->normalizeHeader($alias)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
     
     /**
@@ -352,15 +387,22 @@ class ImportHandler {
             $checkStmt->execute([$fields['auto_number']]);
             $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
             
+            // Derive reg_number from auto_number when not provided as a separate column
+            // (e.g. police CSV where AUTO NUMBER is the vehicle registration)
+            if (empty($fields['reg_number']) && !empty($fields['auto_number'])) {
+                $fields['reg_number'] = preg_replace('/\s+/', '', $fields['auto_number']);
+            }
+
             // Convert NULL to empty strings for database compatibility
             $safeFields = [
-                'reg_number' => $fields['reg_number'] ?? '',
-                'driver_name' => $fields['driver_name'] ?? '',
-                'phone' => $fields['phone'] ?? '',
+                'reg_number'     => $fields['reg_number']     ?? '',
+                'driver_name'    => $fields['driver_name']    ?? '',
+                'phone'          => $fields['phone']          ?? '',
                 'license_number' => $fields['license_number'] ?? '',
-                'permit_number' => $fields['permit_number'] ?? '',
-                'area' => $fields['area'] ?? '',
-                'stand' => $fields['stand'] ?? '',
+                'aadhar_number'  => $fields['aadhar_number']  ?? '',
+                'permit_number'  => $fields['permit_number']  ?? '',
+                'area'           => $fields['area']           ?? '',
+                'stand'          => $fields['stand']          ?? '',
                 'security_detail' => $fields['security_detail'] ?? 'safe',
             ];
             
@@ -368,17 +410,18 @@ class ImportHandler {
                 // Update existing record (keep qr_token if it exists)
                 $qrToken = $existing['qr_token'];
                 $stmt = $this->pdo->prepare("
-                    UPDATE autos 
-                    SET reg_number = ?, driver_name = ?, phone = ?, license_number = ?, 
-                        permit_number = ?, area = ?, stand = ?, security_detail = ?
+                    UPDATE autos
+                    SET reg_number = ?, driver_name = ?, phone = ?, license_number = ?,
+                        aadhar_number = ?, permit_number = ?, area = ?, stand = ?, security_detail = ?
                     WHERE auto_number = ?
                 ");
-                
+
                 $stmt->execute([
                     $safeFields['reg_number'],
                     $safeFields['driver_name'],
                     $safeFields['phone'],
                     $safeFields['license_number'],
+                    $safeFields['aadhar_number'],
                     $safeFields['permit_number'],
                     $safeFields['area'],
                     $safeFields['stand'],
@@ -408,17 +451,18 @@ class ImportHandler {
                 // Insert new record
                 $qrToken = bin2hex(random_bytes(32));
                 $stmt = $this->pdo->prepare("
-                    INSERT INTO autos 
-                    (auto_number, reg_number, driver_name, phone, license_number, permit_number, area, stand, security_detail, qr_token, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+                    INSERT INTO autos
+                    (auto_number, reg_number, driver_name, phone, license_number, aadhar_number, permit_number, area, stand, security_detail, qr_token, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
                 ");
-                
+
                 $stmt->execute([
                     $fields['auto_number'],
                     $safeFields['reg_number'],
                     $safeFields['driver_name'],
                     $safeFields['phone'],
                     $safeFields['license_number'],
+                    $safeFields['aadhar_number'],
                     $safeFields['permit_number'],
                     $safeFields['area'],
                     $safeFields['stand'],
@@ -456,15 +500,42 @@ class ImportHandler {
     private function transformValue(string $value, string $transform): string {
         switch ($transform) {
             case 'uppercase':
-                $value = strtoupper($value);
-                // Remove extra spaces (for auto_number normalization)
-                $value = preg_replace('/\s+/', ' ', $value);  // Replace multiple spaces with single space
-                $value = trim($value);
-                return $value;
+                return trim(preg_replace('/\s+/', ' ', strtoupper($value)));
+
             case 'phone':
                 return preg_replace('/\D/', '', $value);
+
             case 'trim':
                 return trim($value);
+
+            case 'first_line':
+                // Take only the first non-empty line — used for area fields that
+                // contain multi-line place + reg-number text.
+                foreach (preg_split('/\r\n|\r|\n/', $value) as $line) {
+                    $line = trim($line);
+                    if ($line !== '') {
+                        return $line;
+                    }
+                }
+                return trim($value);
+
+            case 'name_extract':
+                // Extract the person's name from cells like:
+                // "FULL NAME  S/o. Father Name\n Address Line\n City"
+                // Strip everything from "S/o", "D/o", "W/o" onward, then
+                // collapse whitespace and take what's left.
+                $cleaned = preg_replace('/\s+[SDWsdw]\/[oO]\.?.*/s', '', $value);
+                // If pattern wasn't found, fall back to the first line
+                if (trim($cleaned) === '') {
+                    foreach (preg_split('/\r\n|\r|\n/', $value) as $line) {
+                        $line = trim($line);
+                        if ($line !== '') {
+                            return $line;
+                        }
+                    }
+                }
+                return trim(preg_replace('/\s+/', ' ', $cleaned));
+
             default:
                 return $value;
         }
