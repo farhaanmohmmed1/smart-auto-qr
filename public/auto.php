@@ -53,41 +53,368 @@ $securityDetail = $auto ? e($auto['security_detail'] ?? 'safe') : '';
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <meta name="theme-color" content="#0d1117">
+  <meta name="theme-color" content="#1e3a5f">
   <title><?= $auto ? "Auto $autoNumber — $appName" : "Not Found — $appName" ?></title>
-  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
+      min-height: 100vh;
+      padding: 16px;
+      color: #333;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
+      padding: 24px;
+      text-align: center;
+      color: white;
+      border-bottom: 4px solid #f39c12;
+    }
+    .header-title {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+    .header-subtitle {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+    .content {
+      padding: 32px 24px;
+    }
+    .info-section {
+      margin-bottom: 32px;
+    }
+    .section-title {
+      background: #1e3a5f;
+      color: white;
+      padding: 12px 16px;
+      font-weight: bold;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+      border-left: 4px solid #f39c12;
+    }
+    .info-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    .info-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .info-table td:first-child {
+      background: #f5f5f5;
+      font-weight: 600;
+      width: 40%;
+      color: #1e3a5f;
+      text-transform: uppercase;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+    }
+    .info-table td:last-child {
+      font-weight: 500;
+      font-size: 16px;
+      color: #222;
+    }
+    .info-table tr:last-child td {
+      border-bottom: none;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+      text-transform: uppercase;
+      margin-right: 8px;
+    }
+    .status-active { background: #e8f5e9; color: #2e7d32; }
+    .status-suspended { background: #ffebee; color: #c62828; }
+    .status-inactive { background: #fff3e0; color: #e65100; }
+    .safety-safe { color: #2e7d32; }
+    .safety-caution { color: #f57c00; }
+    .safety-danger { color: #c62828; }
+    .action-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 28px;
+    }
+    .btn {
+      padding: 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .btn-complaint {
+      background: #1e88e5;
+      color: white;
+    }
+    .btn-complaint:hover { background: #1565c0; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(30,136,229,0.4); }
+    .btn-sos {
+      background: #d32f2f;
+      color: white;
+      grid-column: 1 / -1;
+    }
+    .btn-sos:hover { background: #b71c1c; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(211,47,47,0.4); }
+    .alert {
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .alert-danger {
+      background: #ffebee;
+      color: #c62828;
+      border-left: 4px solid #c62828;
+    }
+    .alert-warning {
+      background: #fff3e0;
+      color: #e65100;
+      border-left: 4px solid #e65100;
+    }
+    .error-page {
+      background: white;
+      border-radius: 12px;
+      padding: 40px;
+      text-align: center;
+      margin-top: 30px;
+    }
+    .error-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+    .error-page h1 {
+      color: #1e3a5f;
+      margin-bottom: 12px;
+      font-size: 28px;
+    }
+    .error-page p {
+      color: #666;
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal.show { display: flex; }
+    .modal-content {
+      background: white;
+      border-radius: 12px;
+      padding: 32px;
+      max-width: 500px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .modal-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+    .modal-content h2 {
+      color: #1e3a5f;
+      margin-bottom: 12px;
+    }
+    .modal-content p {
+      color: #666;
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+    @media (max-width: 600px) {
+      .action-buttons { grid-template-columns: 1fr; }
+      .btn-sos { grid-column: auto; }
+      .content { padding: 20px 16px; }
+      .info-table td:first-child { width: 50%; font-size: 11px; }
+      .info-table td { padding: 12px; font-size: 14px; }
+    }
+  </style>
 </head>
 <body>
 
 <?php if ($error): ?>
-<!-- ═══════════════════════════════════ ERROR STATE ═════════════ -->
-<div class="page error-page">
-  <div class="error-wrap">
+<div class="container">
+  <div class="header">
+    <div class="header-title">Smart Auto QR Safety System</div>
+    <div class="header-subtitle">Telangana Police Department</div>
+  </div>
+  <div class="error-page">
     <?php if ($error === 'invalid'): ?>
       <div class="error-icon">⚠️</div>
       <h1>Invalid QR Code</h1>
-      <p>This QR code does not contain a valid auto ID. Please scan the correct sticker.</p>
+      <p>This QR code is invalid or expired. Please scan the correct sticker on the auto-rickshaw.</p>
     <?php elseif ($error === 'suspended'): ?>
       <div class="error-icon">🚫</div>
       <h1>Auto Suspended</h1>
-      <p>This auto-rickshaw has been <strong>suspended</strong> by the police. Please avoid boarding.</p>
-      <div class="sos-notice">If you are in danger, call <a href="tel:<?= $helpline ?>"><?= $helpline ?></a></div>
+      <div class="alert alert-danger">
+        <strong>This auto-rickshaw has been SUSPENDED.</strong> Do not board this vehicle.
+        <br><br>
+        For emergency assistance, call: <a href="tel:<?= $helpline ?>" style="color:inherit;font-weight:bold;"><?= $helpline ?></a>
+      </div>
     <?php elseif ($error === 'inactive'): ?>
       <div class="error-icon">⏸️</div>
-      <h1>Auto Inactive</h1>
+      <h1>Auto Not in Service</h1>
       <p>This auto-rickshaw is currently not in active service.</p>
     <?php else: ?>
       <div class="error-icon">🔍</div>
       <h1>Auto Not Found</h1>
-      <p>No auto with ID <code><?= e($autoId) ?></code> exists in the police database.</p>
+      <p>This auto is not registered in our system.</p>
     <?php endif; ?>
-    <a href="tel:<?= $helpline ?>" class="btn btn-outline" style="margin-top:24px;">📞 Call Police: <?= $helpline ?></a>
+    <a href="tel:<?= $helpline ?>" style="display:inline-block;margin-top:20px;padding:12px 24px;background:#1e3a5f;color:white;border-radius:6px;text-decoration:none;font-weight:bold;">📞 Call Police: <?= $helpline ?></a>
   </div>
 </div>
 
 <?php else: ?>
-<!-- ═══════════════════════════════════ OFFICIAL GOVERNMENT DOCUMENT ════════════ -->
-<div class="page">
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-title">Telangana Police</div>
+    <div class="header-subtitle">Auto Rickshaw Verification System</div>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+    <!-- Status Alert -->
+    <div style="text-align:center;margin-bottom:24px;">
+      <span class="status-badge status-<?= $auto['status'] ?>"><?= strtoupper($auto['status']) ?></span>
+      <span class="status-badge" style="background:#e3f2fd;color:#1e3a5f;">✓ VERIFIED</span>
+    </div>
+
+    <!-- Auto Registration Details -->
+    <div class="info-section">
+      <div class="section-title">🚖 Auto Registration Details</div>
+      <table class="info-table">
+        <tr>
+          <td>Auto Number</td>
+          <td style="font-family:monospace;font-size:18px;font-weight:bold;"><?= $autoNumber ?></td>
+        </tr>
+        <?php if ($regNumber): ?>
+        <tr>
+          <td>Vehicle Registration</td>
+          <td style="font-family:monospace;"><?= $regNumber ?></td>
+        </tr>
+        <?php endif; ?>
+      </table>
+    </div>
+
+    <!-- Driver Information -->
+    <div class="info-section">
+      <div class="section-title">👤 Driver Information</div>
+      <table class="info-table">
+        <tr>
+          <td>Driver Name</td>
+          <td><?= $driverName ?></td>
+        </tr>
+        <?php if ($licenseNum): ?>
+        <tr>
+          <td>License Number</td>
+          <td style="font-family:monospace;"><?= $licenseNum ?></td>
+        </tr>
+        <?php endif; ?>
+        <?php if ($driverPhone): ?>
+        <tr>
+          <td>Phone</td>
+          <td><a href="tel:<?= $driverPhone ?>" style="color:#1e88e5;text-decoration:none;"><?= $driverPhone ?></a></td>
+        </tr>
+        <?php endif; ?>
+      </table>
+    </div>
+
+    <!-- Operating Details -->
+    <div class="info-section">
+      <div class="section-title">📍 Operating Details</div>
+      <table class="info-table">
+        <?php if ($area): ?>
+        <tr>
+          <td>Operating Area</td>
+          <td><?= ucwords($area) ?></td>
+        </tr>
+        <?php endif; ?>
+        <?php if ($permitNum): ?>
+        <tr>
+          <td>Permit Number</td>
+          <td style="font-family:monospace;"><?= $permitNum ?></td>
+        </tr>
+        <?php endif; ?>
+        <tr>
+          <td>Safety Status</td>
+          <td>
+            <span style="font-size:20px;margin-right:8px;">
+              <?php 
+                $badges = ['safe' => '✅', 'caution' => '⚠️', 'danger' => '🚫'];
+                echo $badges[$securityDetail] ?? '✅';
+              ?>
+            </span>
+            <strong class="safety-<?= $securityDetail ?>"><?= ucfirst($securityDetail) ?></strong>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-buttons">
+      <button class="btn btn-complaint" onclick="sendComplaint()">📲 Lodge Complaint</button>
+      <button class="btn btn-complaint" style="background:#f57c00;" onclick="callHelpline()">📞 Call Police</button>
+      <button class="btn btn-sos" onclick="triggerSOS()">🚨 Emergency SOS (GPS)</button>
+    </div>
+
+    <!-- Safety Notice -->
+    <div class="alert alert-warning" style="margin-top:28px;">
+      <strong>⚠️ Safety Notice:</strong> Please verify this information matches the vehicle details before boarding. 
+      For emergency situations, immediately press the SOS button above to alert authorities with your GPS location.
+    </div>
+  </div>
+</div>
+
+<!-- SOS Modal -->
+<div id="sosModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-icon">🚨</div>
+    <h2>EMERGENCY ALERT</h2>
+    <p id="sosStatus">Locating your position...</p>
+    <div style="margin:24px 0;height:4px;background:#e0e0e0;border-radius:2px;overflow:hidden;">
+      <div style="height:100%;background:#d32f2f;animation:progress 2s ease-in-out infinite;"></div>
+    </div>
+    <div id="sosActions" style="display:none;gap:12px;">
+      <button class="btn btn-sos" onclick="sendSOS()" style="grid-column:1 / -1;margin-bottom:12px;">📲 Send SOS Alert</button>
+      <button class="btn" onclick="closeSOS()" style="background:#e0e0e0;color:#333;grid-column:1 / -1;">Cancel</button>
+    </div>
+    <button class="btn" onclick="closeSOS()" id="closeBtn" style="background:#e0e0e0;color:#333;width:100%;">Close</button>
+  </div>
+</div>
+
+<style>
+  @keyframes progress {
+    0%, 100% { width: 0; }
+    50% { width: 100%; }
+  }
+</style>
 
   <!-- Government Header -->
   <div class="govt-header">
