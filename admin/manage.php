@@ -130,6 +130,7 @@ $areas = $pdo->query("SELECT DISTINCT area FROM autos WHERE area IS NOT NULL AND
               <th>Phone</th>
               <th>Reg. No.</th>
               <th>Area</th>
+              <th>Safety</th>
               <th>Status</th>
               <th>QR</th>
               <th>Actions</th>
@@ -151,6 +152,13 @@ $areas = $pdo->query("SELECT DISTINCT area FROM autos WHERE area IS NOT NULL AND
               </td>
               <td><?= e($a['reg_number']) ?></td>
               <td><?= e($a['area'] ?? '—') ?></td>
+              <td>
+                <?php 
+                  $badges = ['safe' => '✅ Safe', 'caution' => '⚠️ Caution', 'danger' => '🚫 Danger'];
+                  $secBadge = $badges[$a['security_detail']] ?? '✅ Safe';
+                ?>
+                <span style="font-size:0.75rem;"><?= $secBadge ?></span>
+              </td>
               <td><span class="pill pill-<?= $a['status'] ?>"><?= strtoupper($a['status']) ?></span></td>
               <td>
                 <?php

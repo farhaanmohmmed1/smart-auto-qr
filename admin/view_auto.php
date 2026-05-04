@@ -71,7 +71,10 @@ $autoURL = generateAutoURL($auto['auto_number']);
           </div>
           <div class="card-body">
             <div class="form-grid" style="row-gap:16px;">
-              <?php foreach([
+              <?php 
+                $badges = ['safe' => '✅ Safe', 'caution' => '⚠️ Caution', 'danger' => '🚫 Danger'];
+                $secBadge = $badges[$auto['security_detail']] ?? '✅ Safe';
+                foreach([
                 'Auto Number'    => $auto['auto_number'],
                 'Reg. Number'    => $auto['reg_number'],
                 'Driver Name'    => $auto['driver_name'],
@@ -80,6 +83,7 @@ $autoURL = generateAutoURL($auto['auto_number']);
                 'Permit Number'  => $auto['permit_number'],
                 'Area'           => $auto['area'] ?? '—',
                 'Stand'          => $auto['stand'] ?? '—',
+                'Safety Status'  => $secBadge,
                 'Added On'       => date('d M Y, H:i', strtotime($auto['created_at'])),
               ] as $lbl => $val): ?>
               <div>

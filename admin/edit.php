@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $permit_number  = strtoupper(trim($_POST['permit_number']  ?? ''));
     $area           = trim($_POST['area']  ?? '');
     $stand          = trim($_POST['stand'] ?? '');
+    $security_detail = in_array($_POST['security_detail'], ['safe','caution','danger']) ? $_POST['security_detail'] : 'safe';
     $status         = in_array($_POST['status'], ['active','inactive','suspended']) ? $_POST['status'] : 'active';
 
     $errors = [];
@@ -37,9 +38,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $stmt = $pdo->prepare("UPDATE autos SET
             reg_number=?, driver_name=?, phone=?, license_number=?,
-            permit_number=?, area=?, stand=?, status=?
+            permit_number=?, area=?, stand=?, security_detail=?, status=?
             WHERE id=?");
-        $stmt->execute([$reg_number, $driver_name, $phone, $license_number, $permit_number, $area, $stand, $status, $id]);
+        $stmt->execute([$reg_number, $driver_name, $phone, $license_number, $permit_number, $area, $stand, $security_detail, $status, $id]);
 
         // QR CODE CONSISTENCY: Only regenerate if QR is NOT locked
         // Once locked, QR code NEVER changes (ensures sticker consistency)
@@ -53,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect("manage.php?flash=updated");
     }
     // Refresh $auto for repopulation
-    $auto = array_merge($auto, compact('reg_number','driver_name','phone','license_number','permit_number','area','stand','status'));
+    $auto = array_merge($auto, compact('reg_number','driver_name','phone','license_number','permit_number','area','stand','security_detail','status'));
 }
 ?>
 <!DOCTYPE html>
@@ -125,6 +126,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               <div class="form-group">
                 <label>Stand</label>
                 <input type="text" name="stand" value="<?= e($auto['stand'] ?? '') ?>">
+              </div>
+              <div class="form-group">
+                <label>Safety Status</label>
+                <select name="security_detail">
+                  <option value="safe"    <?= ($auto['security_detail'] ?? 'safe')==='safe'    ?'selected':'' ?>>✅ Safe</option>
+                  <option value="caution" <?= ($auto['security_detail'] ?? 'safe')==='caution' ?'selected':'' ?>>⚠️ Caution</option>
+                  <option value="danger"  <?= ($auto['security_detail'] ?? 'safe')==='danger'  ?'selected':'' ?>>🚫 Danger</option>
+                </select>
               </div>
               <div class="form-group">
                 <label>Status</label>

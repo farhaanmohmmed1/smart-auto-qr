@@ -46,6 +46,7 @@ $driverPhone= $auto ? e($auto['phone'])        : '';
 $area       = $auto ? e($auto['area'] ?? '')   : '';
 $licenseNum = $auto ? e($auto['license_number']): '';
 $permitNum  = $auto ? e($auto['permit_number']) : '';
+$securityDetail = $auto ? e($auto['security_detail'] ?? 'safe') : '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -162,6 +163,21 @@ $permitNum  = $auto ? e($auto['permit_number']) : '';
         <div class="detail-col-100">
           <div class="detail-label-formal">Contact Number</div>
           <div class="detail-value-formal"><?= $driverPhone ?></div>
+        </div>
+      </div>
+
+      <div class="detail-row">
+        <div class="detail-col-100">
+          <div class="detail-label-formal">Safety Status</div>
+          <div class="detail-value-formal" style="display:flex;align-items:center;gap:8px;">
+            <?php 
+              $secBadges = ['safe' => '✅', 'caution' => '⚠️', 'danger' => '🚫'];
+              $secIcon = $secBadges[$securityDetail] ?? '✅';
+              $secLabel = ucfirst($securityDetail);
+            ?>
+            <span><?= $secIcon ?></span>
+            <span><?= $secLabel ?></span>
+          </div>
         </div>
       </div>
     </div>
