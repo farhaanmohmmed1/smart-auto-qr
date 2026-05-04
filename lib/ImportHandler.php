@@ -479,7 +479,7 @@ class ImportHandler {
         
         $stmt->execute([
             $stats['successful'],
-            $stats['skipped'],
+            0,  // No longer skipping records (they are updated instead)
             $stats['error_count'],
             json_encode($this->results),
             $importId,
