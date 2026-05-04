@@ -20,22 +20,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $permit_number   = strtoupper(trim($_POST['permit_number']  ?? ''));
         $area            = trim($_POST['area']  ?? '');
         $stand           = trim($_POST['stand'] ?? '');
+        $security_detail = in_array($_POST['security_detail'] ?? 'safe', ['safe','caution','danger']) ? $_POST['security_detail'] : 'safe';
 
-        // Validate
+        // Validate - ONLY auto_number and driver_name are required
         $errors = [];
-        if (!$auto_number)    $errors[] = 'Auto Number is required.';
-        if (!$reg_number)     $errors[] = 'Registration Number is required.';
-        if (!$driver_name)    $errors[] = 'Driver Name is required.';
-        if (!$phone || strlen($phone) < 10) $errors[] = 'Valid 10-digit Phone Number required.';
-        if (!$license_number) $errors[] = 'License Number is required.';
-        if (!$permit_number)  $errors[] = 'Permit Number is required.';
+        if (!$auto_number)    $errors[] = 'Auto Number is required (2-50 characters).';
+        if (!$driver_name)    $errors[] = 'Driver Name is required (3-100 characters).';
+        
+        // Validate lengths
+        if ($auto_number && (strlen($auto_number) < 2 || strlen($auto_number) > 50)) {
+            $errors[] = 'Auto Number must be 2-50 characters.';
+        }
+        if ($driver_name && (strlen($driver_name) < 3 || strlen($driver_name) > 100)) {
+            $errors[] = 'Driver Name must be 3-100 characters.';
+        }
+        
+        // Validate optional fields if provided
+        if ($phone && strlen($phone) < 10) $errors[] = 'Phone must be 10-12 digits if provided.';
 
-        // Check duplicates
+        // Check for duplicate auto_number only
         if (!$errors) {
-            $dup = $pdo->prepare("SELECT id FROM autos WHERE auto_number=? OR reg_number=? OR license_number=?");
-            $dup->execute([$auto_number, $reg_number, $license_number]);
+            $dup = $pdo->prepare("SELECT id FROM autos WHERE auto_number=?");
+            $dup->execute([$auto_number]);
             if ($dup->fetch()) {
-                $errors[] = 'Auto Number, Registration Number, or License Number already exists.';
+                $errors[] = 'This Auto Number already exists.';
             }
         }
 
@@ -46,11 +54,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Generate secure token for QR code
                 $qrToken = bin2hex(random_bytes(32));
                 
+                // Convert empty strings to NULL for optional fields
+                $safeFields = [
+                    'reg_number' => $reg_number ?: '',
+                    'driver_name' => $driver_name,
+                    'phone' => $phone ?: '',
+                    'license_number' => $license_number ?: '',
+                    'permit_number' => $permit_number ?: '',
+                    'area' => $area ?: '',
+                    'stand' => $stand ?: '',
+                    'security_detail' => $security_detail,
+                ];
+                
                 // Insert record
                 $stmt = $pdo->prepare("INSERT INTO autos 
-                    (auto_number, reg_number, driver_name, phone, license_number, permit_number, area, stand, qr_token, status)
-                    VALUES (?,?,?,?,?,?,?,?,?,'active')");
-                $stmt->execute([$auto_number, $reg_number, $driver_name, $phone, $license_number, $permit_number, $area, $stand, $qrToken]);
+                    (auto_number, reg_number, driver_name, phone, license_number, permit_number, area, stand, security_detail, qr_token, status)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,'active')");
+                $stmt->execute([$auto_number, $safeFields['reg_number'], $safeFields['driver_name'], $safeFields['phone'], $safeFields['license_number'], $safeFields['permit_number'], $safeFields['area'], $safeFields['stand'], $safeFields['security_detail'], $qrToken]);
 
                 // Generate QR code
                 $qrPath = QRGenerator::generate($auto_number);
@@ -68,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 // Clear form
-                $auto_number = $reg_number = $driver_name = $phone = $license_number = $permit_number = $area = $stand = '';
+                $auto_number = $reg_number = $driver_name = $phone = $license_number = $permit_number = $area = $stand = $security_detail = '';
 
             } catch (PDOException $e) {
                 $error = 'Database error: ' . $e->getMessage();
@@ -132,11 +152,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
 
             <div class="form-group">
-              <label>Vehicle Registration Number <span style="color:#ef5350">*</span></label>
+              <label>Vehicle Registration Number</label>
               <input type="text" name="reg_number"
                      value="<?= e($reg_number ?? '') ?>"
-                     placeholder="e.g. TS09EA1234" required
+                     placeholder="e.g. TS09EA1234"
                      oninput="this.value=this.value.toUpperCase()">
+              <div class="form-hint">Optional - Vehicle registration number</div>
             </div>
 
             <div class="form-group">
@@ -147,27 +168,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
 
             <div class="form-group">
-              <label>Phone Number <span style="color:#ef5350">*</span></label>
+              <label>Phone Number</label>
               <input type="tel" name="phone"
                      value="<?= e($phone ?? '') ?>"
-                     placeholder="e.g. 9876543210" required
-                     maxlength="10" pattern="[0-9]{10}">
+                     placeholder="e.g. 9876543210"
+                     maxlength="12" pattern="[0-9]{10,12}">
+              <div class="form-hint">Optional - 10-12 digit phone number</div>
             </div>
 
             <div class="form-group">
-              <label>Driving License Number <span style="color:#ef5350">*</span></label>
+              <label>Driving License Number</label>
               <input type="text" name="license_number"
                      value="<?= e($license_number ?? '') ?>"
-                     placeholder="e.g. TS14DL20200001" required
+                     placeholder="e.g. TS14DL20200001"
                      oninput="this.value=this.value.toUpperCase()">
+              <div class="form-hint">Optional - Driver license ID</div>
             </div>
 
             <div class="form-group">
-              <label>Permit Number <span style="color:#ef5350">*</span></label>
+              <label>Permit Number</label>
               <input type="text" name="permit_number"
                      value="<?= e($permit_number ?? '') ?>"
-                     placeholder="e.g. HYD/PERMIT/2024/001" required
+                     placeholder="e.g. HYD/PERMIT/2024/001"
                      oninput="this.value=this.value.toUpperCase()">
+              <div class="form-hint">Optional - Operating permit ID</div>
             </div>
 
             <div class="form-group">
@@ -182,6 +206,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               <input type="text" name="stand"
                      value="<?= e($stand ?? '') ?>"
                      placeholder="e.g. KPHB Colony Stand">
+            </div>
+
+            <div class="form-group">
+              <label>Safety Status</label>
+              <select name="security_detail">
+                <option value="safe" <?= ($security_detail ?? 'safe')==='safe'    ?'selected':'' ?>>✅ Safe</option>
+                <option value="caution" <?= ($security_detail ?? 'safe')==='caution' ?'selected':'' ?>>⚠️ Caution</option>
+                <option value="danger"  <?= ($security_detail ?? 'safe')==='danger'  ?'selected':'' ?>>🚫 Danger</option>
+              </select>
+              <div class="form-hint">Default: Safe</div>
             </div>
 
           </div><!-- /form-grid -->
