@@ -107,6 +107,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Get CSRF token for form
+// ── Handle schema migration ───────────────────────────────
+if (isset($_POST['fix_schema'])) {
+    if (!validateCSRFToken($_POST['csrf_token'] ?? '')) {
+        $error = 'CSRF token invalid. Please try again.';
+    } else {
+        try {
+            $updates = [
+                "ALTER TABLE autos MODIFY COLUMN reg_number VARCHAR(30) DEFAULT ''",
+                "ALTER TABLE autos MODIFY COLUMN phone VARCHAR(15) DEFAULT ''",
+                "ALTER TABLE autos MODIFY COLUMN license_number VARCHAR(50) DEFAULT ''",
+                "ALTER TABLE autos MODIFY COLUMN permit_number VARCHAR(50) DEFAULT ''",
+                "ALTER TABLE autos MODIFY COLUMN area VARCHAR(100) DEFAULT ''",
+                "ALTER TABLE autos MODIFY COLUMN stand VARCHAR(100) DEFAULT ''",
+            ];
+            
+            foreach ($updates as $sql) {
+                $pdo->exec($sql);
+            }
+            
+            $success = "✅ Database schema updated successfully! Optional fields can now accept empty values.";
+        } catch (Exception $e) {
+            $error = "Schema update error: " . $e->getMessage();
+        }
+    }
+}
+
 $csrf_token = generateCSRFToken();
 
 ?>
@@ -272,6 +298,19 @@ $csrf_token = generateCSRFToken();
         ✅ <?= htmlspecialchars($success) ?>
       </div>
     <?php endif; ?>
+
+    <!-- Database Schema Fix (if needed) -->
+    <div style="margin-bottom: 20px;">
+      <form method="POST" style="display: inline;">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken()) ?>">
+        <button type="submit" name="fix_schema" value="1" class="btn btn-secondary" style="font-size: 0.85rem; padding: 8px 12px;">
+          🔧 Fix Database Schema (if imports are failing)
+        </button>
+      </form>
+      <p style="font-size: 0.8rem; color: #8b949e; margin-top: 5px;">
+        Click this if you see "Integrity constraint violation" errors during import.
+      </p>
+    </div>
 
     <!-- Upload Zone -->
     <div class="card">

@@ -351,6 +351,17 @@ class ImportHandler {
             $checkStmt->execute([$fields['auto_number']]);
             $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
             
+            // Convert NULL to empty strings for database compatibility
+            $safeFields = [
+                'reg_number' => $fields['reg_number'] ?? '',
+                'driver_name' => $fields['driver_name'] ?? '',
+                'phone' => $fields['phone'] ?? '',
+                'license_number' => $fields['license_number'] ?? '',
+                'permit_number' => $fields['permit_number'] ?? '',
+                'area' => $fields['area'] ?? '',
+                'stand' => $fields['stand'] ?? '',
+            ];
+            
             if ($existing) {
                 // Update existing record (keep qr_token if it exists)
                 $qrToken = $existing['qr_token'];
@@ -362,13 +373,13 @@ class ImportHandler {
                 ");
                 
                 $stmt->execute([
-                    $fields['reg_number'],
-                    $fields['driver_name'],
-                    $fields['phone'],
-                    $fields['license_number'],
-                    $fields['permit_number'],
-                    $fields['area'],
-                    $fields['stand'],
+                    $safeFields['reg_number'],
+                    $safeFields['driver_name'],
+                    $safeFields['phone'],
+                    $safeFields['license_number'],
+                    $safeFields['permit_number'],
+                    $safeFields['area'],
+                    $safeFields['stand'],
                     $fields['auto_number'],
                 ]);
                 
@@ -387,13 +398,13 @@ class ImportHandler {
                 
                 $stmt->execute([
                     $fields['auto_number'],
-                    $fields['reg_number'],
-                    $fields['driver_name'],
-                    $fields['phone'],
-                    $fields['license_number'],
-                    $fields['permit_number'],
-                    $fields['area'],
-                    $fields['stand'],
+                    $safeFields['reg_number'],
+                    $safeFields['driver_name'],
+                    $safeFields['phone'],
+                    $safeFields['license_number'],
+                    $safeFields['permit_number'],
+                    $safeFields['area'],
+                    $safeFields['stand'],
                     $qrToken,
                 ]);
                 
