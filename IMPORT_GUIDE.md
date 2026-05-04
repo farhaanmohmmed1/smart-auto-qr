@@ -33,6 +33,7 @@ These fields will be stored as **empty/blank** in the database if missing from y
 | Permit Number | Operating permit ID | Alphanumeric | `HYD/PERMIT/2024/001` |
 | Area | Operating zone/area | Any text | `Ameerpet` |
 | Stand | Auto stand/depot name | Any text | `Ameerpet Stand` |
+| Security | Safety status | safe / caution / danger | `safe` or `caution` |
 
 ---
 
@@ -63,6 +64,9 @@ The system **automatically detects** columns by their header names. These altern
 
 ### Stand
 - `Stand`, `Stand Name`, `Depot`, `Stand Depot`, `stand`
+
+### Security
+- `Security`, `Security Detail`, `Safety Status`, `Security Status`, `security_detail`
 
 ---
 

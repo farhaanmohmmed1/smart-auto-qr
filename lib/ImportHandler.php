@@ -27,6 +27,7 @@ class ImportHandler {
         'permit_number'  => ['required' => false, 'transform' => 'uppercase', 'aliases' => ['Permit Number', 'Permit#', 'Permit']],
         'area'           => ['required' => false, 'transform' => 'trim', 'aliases' => ['Area', 'Zone', 'Operating Area']],
         'stand'          => ['required' => false, 'transform' => 'trim', 'aliases' => ['Stand', 'Stand Name', 'Depot', 'Stand Depot']],
+        'security_detail' => ['required' => false, 'transform' => 'lowercase', 'aliases' => ['Security', 'Security Detail', 'Safety Status', 'Security Status']],
     ];
     
     public function __construct($pdo, int $adminId) {
@@ -360,6 +361,7 @@ class ImportHandler {
                 'permit_number' => $fields['permit_number'] ?? '',
                 'area' => $fields['area'] ?? '',
                 'stand' => $fields['stand'] ?? '',
+                'security_detail' => $fields['security_detail'] ?? 'safe',
             ];
             
             if ($existing) {
@@ -368,7 +370,7 @@ class ImportHandler {
                 $stmt = $this->pdo->prepare("
                     UPDATE autos 
                     SET reg_number = ?, driver_name = ?, phone = ?, license_number = ?, 
-                        permit_number = ?, area = ?, stand = ?
+                        permit_number = ?, area = ?, stand = ?, security_detail = ?
                     WHERE auto_number = ?
                 ");
                 
@@ -380,6 +382,7 @@ class ImportHandler {
                     $safeFields['permit_number'],
                     $safeFields['area'],
                     $safeFields['stand'],
+                    $safeFields['security_detail'],
                     $fields['auto_number'],
                 ]);
                 
@@ -392,8 +395,8 @@ class ImportHandler {
                 $qrToken = bin2hex(random_bytes(32));
                 $stmt = $this->pdo->prepare("
                     INSERT INTO autos 
-                    (auto_number, reg_number, driver_name, phone, license_number, permit_number, area, stand, qr_token, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+                    (auto_number, reg_number, driver_name, phone, license_number, permit_number, area, stand, security_detail, qr_token, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
                 ");
                 
                 $stmt->execute([
@@ -405,6 +408,7 @@ class ImportHandler {
                     $safeFields['permit_number'],
                     $safeFields['area'],
                     $safeFields['stand'],
+                    $safeFields['security_detail'],
                     $qrToken,
                 ]);
                 

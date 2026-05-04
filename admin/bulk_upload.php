@@ -42,16 +42,17 @@ function downloadTemplate() {
         'License Number',
         'Permit Number',
         'Area',
-        'Stand'
+        'Stand',
+        'Security'
     ]);
     
     // Sample rows
     $samples = [
-        ['AP 40 CB 6407', 'AP40CB6407', 'Ramesh Kumar', '9876543210', 'TS14DL20190001', 'HYD/PERMIT/2024/001', 'Ameerpet', 'Ameerpet Stand'],
-        ['TS 09 EA 1234', 'TS09EA1234', 'Suresh Reddy', '9845612345', 'TS14DL20200045', 'HYD/PERMIT/2024/002', 'Kukatpally', 'KPHB Colony Stand'],
-        ['TS 09 EB 5678', 'TS09EB5678', 'Mahesh Yadav', '9912378456', 'TS14DL20180023', 'HYD/PERMIT/2024/003', 'Secunderabad', 'Clock Tower Stand'],
-        ['AP 39 UQ 9305', 'AP39UQ9305', 'Venkat Rao', '9900087654', 'TS14DL20210067', 'HYD/PERMIT/2024/004', 'Hitech City', 'Cyber Tower Stand'],
-        ['AP 31 TF 2581', 'AP31TF2581', 'Naresh Sharma', '9988776655', 'TS14DL20220012', 'HYD/PERMIT/2024/005', 'LB Nagar', 'LB Nagar Stand'],
+        ['AP 40 CB 6407', 'AP40CB6407', 'Ramesh Kumar', '9876543210', 'TS14DL20190001', 'HYD/PERMIT/2024/001', 'Ameerpet', 'Ameerpet Stand', 'safe'],
+        ['TS 09 EA 1234', 'TS09EA1234', 'Suresh Reddy', '9845612345', 'TS14DL20200045', 'HYD/PERMIT/2024/002', 'Kukatpally', 'KPHB Colony Stand', 'safe'],
+        ['TS 09 EB 5678', 'TS09EB5678', 'Mahesh Yadav', '9912378456', 'TS14DL20180023', 'HYD/PERMIT/2024/003', 'Secunderabad', 'Clock Tower Stand', 'caution'],
+        ['AP 39 UQ 9305', 'AP39UQ9305', 'Venkat Rao', '9900087654', 'TS14DL20210067', 'HYD/PERMIT/2024/004', 'Hitech City', 'Cyber Tower Stand', 'safe'],
+        ['AP 31 TF 2581', 'AP31TF2581', 'Naresh Sharma', '9988776655', 'TS14DL20220012', 'HYD/PERMIT/2024/005', 'LB Nagar', 'LB Nagar Stand', 'safe'],
     ];
     
     foreach ($samples as $row) {
@@ -122,11 +123,18 @@ if (isset($_POST['fix_schema'])) {
                 "ALTER TABLE autos MODIFY COLUMN stand VARCHAR(100) DEFAULT ''",
             ];
             
+            // Check if security_detail column exists
+            $checkColumn = $pdo->query("SHOW COLUMNS FROM autos WHERE Field = 'security_detail'");
+            if ($checkColumn->rowCount() === 0) {
+                // Add security_detail column if it doesn't exist
+                $updates[] = "ALTER TABLE autos ADD COLUMN security_detail ENUM('safe','caution','danger') DEFAULT 'safe' AFTER stand";
+            }
+            
             foreach ($updates as $sql) {
                 $pdo->exec($sql);
             }
             
-            $success = "✅ Database schema updated successfully! Optional fields can now accept empty values.";
+            $success = "✅ Database schema updated successfully! Optional fields and security detail are now configured.";
         } catch (Exception $e) {
             $error = "Schema update error: " . $e->getMessage();
         }
@@ -424,11 +432,17 @@ $csrf_token = generateCSRFToken();
                 <td style="padding: 12px;">Operating zone/area</td>
                 <td style="padding: 12px;"><code>Ameerpet</code></td>
               </tr>
-              <tr>
+              <tr style="border-bottom: 1px solid #30363d;">
                 <td style="padding: 12px;"><strong>Stand</strong></td>
                 <td style="padding: 12px;">⚪ Optional</td>
                 <td style="padding: 12px;">Auto stand/depot name</td>
                 <td style="padding: 12px;"><code>Ameerpet Stand</code></td>
+              </tr>
+              <tr>
+                <td style="padding: 12px;"><strong>Security</strong></td>
+                <td style="padding: 12px;">⚪ Optional</td>
+                <td style="padding: 12px;">safe, caution, or danger</td>
+                <td style="padding: 12px;"><code>safe</code>, <code>caution</code></td>
               </tr>
             </tbody>
           </table>
