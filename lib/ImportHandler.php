@@ -264,7 +264,6 @@ class ImportHandler {
         $stats = [
             'total' => count($rows),
             'successful' => 0,
-            'skipped' => 0,
             'error_count' => 0,
         ];
         
@@ -280,8 +279,6 @@ class ImportHandler {
                 
                 if ($result['status'] === 'success') {
                     $stats['successful']++;
-                } elseif ($result['status'] === 'skip') {
-                    $stats['skipped']++;
                 } else {
                     $stats['error_count']++;
                 }
@@ -348,58 +345,68 @@ class ImportHandler {
             ]);
         }
         
-        // Check for duplicates (only for unique fields if present)
-        $duplicate = $this->checkDuplicate($fields['auto_number'], $fields['license_number']);
-        if ($duplicate) {
-            return array_merge($result, [
-                'status' => 'skip',
-                'message' => "Duplicate (auto exists): {$fields['auto_number']}",
-            ]);
-        }
-        
-        // Insert record
+        // Insert or update record
         try {
-            // Generate secure token for QR code
-            $qrToken = bin2hex(random_bytes(32));
+            // Check if record already exists
+            $checkStmt = $this->pdo->prepare("SELECT id, qr_token FROM autos WHERE auto_number = ?");
+            $checkStmt->execute([$fields['auto_number']]);
+            $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
             
-            $stmt = $this->pdo->prepare("
-                INSERT INTO autos 
-                (auto_number, reg_number, driver_name, phone, license_number, permit_number, area, stand, qr_token, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
-            ");
-            
-            $stmt->execute([
-                $fields['auto_number'],
-                $fields['reg_number'],
-                $fields['driver_name'],
-                $fields['phone'],
-                $fields['license_number'],
-                $fields['permit_number'],
-                $fields['area'],
-                $fields['stand'],
-                $qrToken,
-            ]);
-            
-            $autoId = $this->pdo->lastInsertId();
-            
-            // Generate QR code (done outside transaction to avoid blocking)
-            // Queue for async processing or do it after commit
-            
-            return array_merge($result, [
-                'status' => 'success',
-                'message' => "Inserted successfully (ID: $autoId)",
-            ]);
-            
-        } catch (Exception $e) {
-            // Check if duplicate key error
-            if (strpos($e->getMessage(), '23000') !== false || 
-                strpos($e->getMessage(), 'Duplicate') !== false) {
+            if ($existing) {
+                // Update existing record (keep qr_token if it exists)
+                $qrToken = $existing['qr_token'];
+                $stmt = $this->pdo->prepare("
+                    UPDATE autos 
+                    SET reg_number = ?, driver_name = ?, phone = ?, license_number = ?, 
+                        permit_number = ?, area = ?, stand = ?
+                    WHERE auto_number = ?
+                ");
+                
+                $stmt->execute([
+                    $fields['reg_number'],
+                    $fields['driver_name'],
+                    $fields['phone'],
+                    $fields['license_number'],
+                    $fields['permit_number'],
+                    $fields['area'],
+                    $fields['stand'],
+                    $fields['auto_number'],
+                ]);
+                
                 return array_merge($result, [
-                    'status' => 'skip',
-                    'message' => 'Duplicate entry (auto_number already exists)',
+                    'status' => 'success',
+                    'message' => "Updated existing record",
+                ]);
+            } else {
+                // Insert new record
+                $qrToken = bin2hex(random_bytes(32));
+                $stmt = $this->pdo->prepare("
+                    INSERT INTO autos 
+                    (auto_number, reg_number, driver_name, phone, license_number, permit_number, area, stand, qr_token, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+                ");
+                
+                $stmt->execute([
+                    $fields['auto_number'],
+                    $fields['reg_number'],
+                    $fields['driver_name'],
+                    $fields['phone'],
+                    $fields['license_number'],
+                    $fields['permit_number'],
+                    $fields['area'],
+                    $fields['stand'],
+                    $qrToken,
+                ]);
+                
+                $autoId = $this->pdo->lastInsertId();
+                
+                return array_merge($result, [
+                    'status' => 'success',
+                    'message' => "Inserted successfully (ID: $autoId)",
                 ]);
             }
             
+        } catch (Exception $e) {
             return array_merge($result, [
                 'status' => 'error',
                 'message' => 'Database error: ' . substr($e->getMessage(), 0, 100),
@@ -450,36 +457,6 @@ class ImportHandler {
     }
     
     /**
-     * Check for duplicate auto
-     */
-    private function checkDuplicate(string $autoNumber, ?string $licenseNumber): bool {
-        // Always check auto_number (it's unique and required)
-        $stmt = $this->pdo->prepare("
-            SELECT id FROM autos 
-            WHERE auto_number = ? 
-            LIMIT 1
-        ");
-        $stmt->execute([$autoNumber]);
-        
-        if ($stmt->rowCount() > 0) {
-            return true;
-        }
-        
-        // Only check license_number if provided
-        if ($licenseNumber) {
-            $stmt = $this->pdo->prepare("
-                SELECT id FROM autos 
-                WHERE license_number = ? 
-                LIMIT 1
-            ");
-            $stmt->execute([$licenseNumber]);
-            return $stmt->rowCount() > 0;
-        }
-        
-        return false;
-    }
-    
-    /**
      * Log import start
      */
     private function logImportStart(string $filename, string $type, int $totalRows): int {
@@ -515,9 +492,8 @@ class ImportHandler {
      */
     private function formatSummary(array $stats): string {
         return sprintf(
-            'Import complete: ✅ %d inserted, ⚠️ %d skipped, ❌ %d errors (Total: %d rows)',
+            'Import complete: ✅ %d processed, ❌ %d errors (Total: %d rows)',
             $stats['successful'],
-            $stats['skipped'],
             $stats['error_count'],
             $stats['total']
         );

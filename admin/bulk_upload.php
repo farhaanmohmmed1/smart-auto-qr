@@ -94,10 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $error = $importResults['error'] ?? $importResults['message'] ?? 'Unknown error occurred';
                     } else {
                         $success = "✅ Imported " . ($importResults['successful'] ?? 0) . " records successfully. ";
-                        if (($importResults['skipped'] ?? 0) > 0) {
-                            $success .= ($importResults['skipped'] ?? 0) . " skipped (duplicates). ";
-                        }
-                        if (($importResults['errors'] ?? 0) > 0) {
+                        if (($importResults['error_count'] ?? 0) > 0) {
                             $success .= ($importResults['errors'] ?? 0) . " errors.";
                         }
                     }
@@ -454,15 +451,10 @@ $csrf_token = generateCSRFToken();
               <?php
                 $total = $importResults['total'] ?? 0;
                 $successful = $importResults['successful'] ?? 0;
-                $skipped = $importResults['skipped'] ?? 0;
-                $errors = $importResults['errors'] ?? 0;
+                $errors = $importResults['error_count'] ?? 0;
                 
                 $summary = "Out of <strong>{$total} total records</strong>, ";
-                $summary .= "<strong>{$successful} were successfully added</strong> ";
-                
-                if ($skipped > 0) {
-                  $summary .= "and <strong>{$skipped} were skipped due to duplicates</strong> ";
-                }
+                $summary .= "<strong>{$successful} were successfully processed</strong> ";
                 
                 if ($errors > 0) {
                   $summary .= "and <strong>{$errors} had validation errors</strong>";
@@ -480,14 +472,10 @@ $csrf_token = generateCSRFToken();
           <div class="summary-card">
             <div class="summary-stat">
               <div class="number" style="color: #2da44e;"><?= $importResults['successful'] ?? 0 ?></div>
-              <div class="label">✅ Successfully Added</div>
+              <div class="label">✅ Successfully Processed</div>
             </div>
             <div class="summary-stat">
-              <div class="number" style="color: #d29922;"><?= $importResults['skipped'] ?? 0 ?></div>
-              <div class="label">⚠️ Duplicate Skipped</div>
-            </div>
-            <div class="summary-stat">
-              <div class="number" style="color: #da3633;"><?= $importResults['errors'] ?? 0 ?></div>
+              <div class="number" style="color: #da3633;"><?= $importResults['error_count'] ?? 0 ?></div>
               <div class="label">❌ Validation Errors</div>
             </div>
             <div class="summary-stat">
@@ -505,12 +493,10 @@ $csrf_token = generateCSRFToken();
               <button class="tab-btn" data-tab="success" style="padding: 12px 20px; background: none; border: none; color: #8b949e; cursor: pointer; font-weight: 600; transition: all 0.3s;">
                 ✅ Added (<?= $importResults['successful'] ?? 0 ?>)
               </button>
-              <button class="tab-btn" data-tab="skipped" style="padding: 12px 20px; background: none; border: none; color: #8b949e; cursor: pointer; font-weight: 600; transition: all 0.3s;">
-                ⚠️ Duplicates (<?= $importResults['skipped'] ?? 0 ?>)
-              </button>
-              <?php if (($importResults['errors'] ?? 0) > 0): ?>
+
+              <?php if (($importResults['error_count'] ?? 0) > 0): ?>
                 <button class="tab-btn" data-tab="errors" style="padding: 12px 20px; background: none; border: none; color: #8b949e; cursor: pointer; font-weight: 600; transition: all 0.3s;">
-                  ❌ Errors (<?= $importResults['errors'] ?? 0 ?>)
+                  ❌ Errors (<?= $importResults['error_count'] ?? 0 ?>)
                 </button>
               <?php endif; ?>
             </div>
@@ -537,7 +523,6 @@ $csrf_token = generateCSRFToken();
                             <span class="status-badge status-<?= htmlspecialchars($detail['status']) ?>">
                               <?php
                                 if ($detail['status'] === 'success') echo '✅ Success';
-                                elseif ($detail['status'] === 'skip') echo '⚠️ Skipped';
                                 else echo '❌ Error';
                               ?>
                             </span>
@@ -582,40 +567,8 @@ $csrf_token = generateCSRFToken();
                 </div>
               </div>
 
-              <!-- Duplicates Tab -->
-              <div id="tab-skipped" class="tab-content" style="display: none;">
-                <div class="results-table">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Row</th>
-                        <th>Auto Number</th>
-                        <th>Reason</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <?php 
-                        $skippedCount = 0;
-                        foreach ($importResults['details'] as $detail): 
-                          if ($detail['status'] === 'skip'): 
-                            $skippedCount++;
-                      ?>
-                        <tr style="background: rgba(210,154,34,0.05);">
-                          <td><?= (int)$detail['row'] ?></td>
-                          <td><strong><?= htmlspecialchars($detail['auto']) ?></strong></td>
-                          <td style="font-size: 0.9rem; color: #d29922;">⚠️ <?= htmlspecialchars($detail['message']) ?></td>
-                        </tr>
-                      <?php endif; endforeach; ?>
-                      <?php if ($skippedCount === 0): ?>
-                        <tr><td colspan="3" style="text-align: center; padding: 20px; color: #8b949e;">No duplicate records found</td></tr>
-                      <?php endif; ?>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
               <!-- Errors Tab -->
-              <?php if ($importResults['errors'] > 0): ?>
+              <?php if ($importResults['error_count'] > 0): ?>
                 <div id="tab-errors" class="tab-content" style="display: none;">
                   <div class="results-table">
                     <table>
