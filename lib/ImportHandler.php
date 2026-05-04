@@ -386,6 +386,20 @@ class ImportHandler {
                     $fields['auto_number'],
                 ]);
                 
+                // Generate QR code if not exists for this record
+                require_once __DIR__ . '/QRGenerator.php';
+                $checkQR = $this->pdo->prepare("SELECT qr_path FROM autos WHERE auto_number = ?");
+                $checkQR->execute([$fields['auto_number']]);
+                $qrRecord = $checkQR->fetch();
+                
+                if (!$qrRecord['qr_path']) {
+                    $qrPath = QRGenerator::generate($fields['auto_number']);
+                    if ($qrPath) {
+                        $this->pdo->prepare("UPDATE autos SET qr_path = ? WHERE auto_number = ?")
+                            ->execute([$qrPath, $fields['auto_number']]);
+                    }
+                }
+                
                 return array_merge($result, [
                     'status' => 'success',
                     'message' => "Updated existing record",
@@ -414,9 +428,17 @@ class ImportHandler {
                 
                 $autoId = $this->pdo->lastInsertId();
                 
+                // Generate QR code for new record
+                require_once __DIR__ . '/QRGenerator.php';
+                $qrPath = QRGenerator::generate($fields['auto_number']);
+                if ($qrPath) {
+                    $this->pdo->prepare("UPDATE autos SET qr_path = ? WHERE id = ?")
+                        ->execute([$qrPath, $autoId]);
+                }
+                
                 return array_merge($result, [
                     'status' => 'success',
-                    'message' => "Inserted successfully (ID: $autoId)",
+                    'message' => "Inserted successfully (ID: $autoId)" . ($qrPath ? " with QR" : ""),
                 ]);
             }
             
