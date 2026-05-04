@@ -27,7 +27,7 @@ class ImportHandler {
         'permit_number'  => ['required' => false, 'transform' => 'uppercase', 'aliases' => ['Permit Number', 'Permit#', 'Permit']],
         'area'           => ['required' => false, 'transform' => 'trim', 'aliases' => ['Area', 'Zone', 'Operating Area']],
         'stand'          => ['required' => false, 'transform' => 'trim', 'aliases' => ['Stand', 'Stand Name', 'Depot', 'Stand Depot']],
-        'security_detail' => ['required' => false, 'transform' => 'lowercase', 'aliases' => ['Security', 'Security Detail', 'Safety Status', 'Security Status']],
+        'security_detail' => ['required' => false, 'transform' => 'lowercase', 'aliases' => ['Security', 'Security Detail', 'Safety Status', 'Security Status', 'Security Details', 'Security_Details', 'security_details']],
     ];
     
     public function __construct($pdo, int $adminId) {
