@@ -413,7 +413,11 @@ class ImportHandler {
     private function transformValue(string $value, string $transform): string {
         switch ($transform) {
             case 'uppercase':
-                return strtoupper($value);
+                $value = strtoupper($value);
+                // Remove extra spaces (for auto_number normalization)
+                $value = preg_replace('/\s+/', ' ', $value);  // Replace multiple spaces with single space
+                $value = trim($value);
+                return $value;
             case 'phone':
                 return preg_replace('/\D/', '', $value);
             case 'trim':
@@ -427,14 +431,14 @@ class ImportHandler {
      * Validate field values
      */
     private function validateFields(array $fields): array {
+        // Auto number length check (no format restriction - accept any format)
+        if (strlen($fields['auto_number']) < 2 || strlen($fields['auto_number']) > 50) {
+            return ['valid' => false, 'error' => 'Auto number must be 2-50 characters'];
+        }
+        
         // Phone validation (only if provided)
         if ($fields['phone'] && !preg_match('/^\d{10,12}$/', $fields['phone'])) {
             return ['valid' => false, 'error' => 'Invalid phone number (10-12 digits required)'];
-        }
-        
-        // Auto number format check - Indian registration format (XX NN XX NNNN or XXNNXXNNNN)
-        if (!preg_match('/^[A-Z]{2}\s*\d{2}\s*[A-Z]{2}\s*\d{4}$/i', $fields['auto_number'])) {
-            return ['valid' => false, 'error' => 'Invalid auto number format. Expected: AP 40 CB 6407 or AP40CB6407'];
         }
         
         // Driver name length check

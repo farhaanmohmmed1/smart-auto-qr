@@ -349,8 +349,8 @@ $csrf_token = generateCSRFToken();
               <tr style="border-bottom: 1px solid #30363d; background: rgba(255,107,107,0.05);">
                 <td style="padding: 12px;"><strong>Auto Number</strong></td>
                 <td style="padding: 12px;">✅ MUST HAVE</td>
-                <td style="padding: 12px;">Indian registration format</td>
-                <td style="padding: 12px;"><code>AP 40 CB 6407</code> or <code>AP40CB6407</code></td>
+                <td style="padding: 12px;">2-50 characters (any format)</td>
+                <td style="padding: 12px;"><code>AP 40 CB 6407</code>, <code>AUTO-001</code>, etc.</td>
               </tr>
               <tr style="border-bottom: 1px solid #30363d; background: rgba(255,107,107,0.05);">
                 <td style="padding: 12px;"><strong>Driver Name</strong></td>

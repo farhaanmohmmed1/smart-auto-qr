@@ -16,7 +16,7 @@ These fields are **mandatory** and must be present in your file:
 
 | Field | Description | Format | Example |
 |-------|-------------|--------|---------|
-| **Auto Number** | Vehicle registration number | Indian format: XX NN XX NNNN | `AP 40 CB 6407` or `AP40CB6407` |
+| **Auto Number** | Unique identifier (any format) | 2-50 characters | `AP 40 CB 6407`, `AP40CB6407`, `AUTO-001`, etc. |
 | **Driver Name** | Driver's full name | 3-100 characters | `Ramesh Kumar` |
 
 ---
