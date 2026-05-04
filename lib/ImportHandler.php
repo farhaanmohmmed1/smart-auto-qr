@@ -98,8 +98,7 @@ class ImportHandler {
             'import_id' => $importId,
             'total' => $processed['total'],
             'successful' => $processed['successful'],
-            'skipped' => $processed['skipped'],
-            'errors' => $processed['error_count'],
+            'error_count' => $processed['error_count'],
             'details' => $this->results,
             'detected_columns' => $this->headerMapping,  // Show which columns were detected
             'message' => $this->formatSummary($processed),

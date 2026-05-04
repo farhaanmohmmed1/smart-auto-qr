@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } else {
                         $success = "✅ Imported " . ($importResults['successful'] ?? 0) . " records successfully. ";
                         if (($importResults['error_count'] ?? 0) > 0) {
-                            $success .= ($importResults['errors'] ?? 0) . " errors.";
+                            $success .= ($importResults['error_count'] ?? 0) . " errors.";
                         }
                     }
                 }
@@ -607,7 +607,7 @@ $csrf_token = generateCSRFToken();
           <div style="margin-top: 30px; display: flex; gap: 10px; flex-wrap: wrap;">
             <a href="manage.php" class="btn btn-primary">👁️ View All Autos</a>
             <a href="bulk_upload.php" class="btn btn-outline">📤 Import More</a>
-            <?php if ($importResults['errors'] > 0): ?>
+            <?php if ($importResults['error_count'] > 0): ?>
               <a href="#" onclick="downloadErrorReport()" class="btn btn-outline">📥 Download Error Report</a>
             <?php endif; ?>
           </div>
