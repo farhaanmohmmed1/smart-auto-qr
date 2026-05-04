@@ -432,9 +432,9 @@ class ImportHandler {
             return ['valid' => false, 'error' => 'Invalid phone number (10-12 digits required)'];
         }
         
-        // Auto number format check
-        if (!preg_match('/^[A-Z0-9\-]{3,20}$/', $fields['auto_number'])) {
-            return ['valid' => false, 'error' => 'Invalid auto number format'];
+        // Auto number format check - Indian registration format (XX NN XX NNNN or XXNNXXNNNN)
+        if (!preg_match('/^[A-Z]{2}\s*\d{2}\s*[A-Z]{2}\s*\d{4}$/i', $fields['auto_number'])) {
+            return ['valid' => false, 'error' => 'Invalid auto number format. Expected: AP 40 CB 6407 or AP40CB6407'];
         }
         
         // Driver name length check

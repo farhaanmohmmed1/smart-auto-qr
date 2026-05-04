@@ -16,7 +16,7 @@ These fields are **mandatory** and must be present in your file:
 
 | Field | Description | Format | Example |
 |-------|-------------|--------|---------|
-| **Auto Number** | Unique auto rickshaw ID | Alphanumeric, 3-20 chars | `AUTO-001` |
+| **Auto Number** | Vehicle registration number | Indian format: XX NN XX NNNN | `AP 40 CB 6407` or `AP40CB6407` |
 | **Driver Name** | Driver's full name | 3-100 characters | `Ramesh Kumar` |
 
 ---

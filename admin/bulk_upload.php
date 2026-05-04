@@ -47,11 +47,11 @@ function downloadTemplate() {
     
     // Sample rows
     $samples = [
-        ['AUTO-001', 'TS09EA1234', 'Ramesh Kumar', '9876543210', 'TS14DL20190001', 'HYD/PERMIT/2024/001', 'Ameerpet', 'Ameerpet Stand'],
-        ['AUTO-002', 'TS09EB5678', 'Suresh Reddy', '9845612345', 'TS14DL20200045', 'HYD/PERMIT/2024/002', 'Kukatpally', 'KPHB Colony Stand'],
-        ['AUTO-003', 'TS09EC9101', 'Mahesh Yadav', '9912378456', 'TS14DL20180023', 'HYD/PERMIT/2024/003', 'Secunderabad', 'Clock Tower Stand'],
-        ['AUTO-004', 'TS09ED1121', 'Venkat Rao', '9900087654', 'TS14DL20210067', 'HYD/PERMIT/2024/004', 'Hitech City', 'Cyber Tower Stand'],
-        ['AUTO-005', 'TS09EE3141', 'Naresh Sharma', '9988776655', 'TS14DL20220012', 'HYD/PERMIT/2024/005', 'LB Nagar', 'LB Nagar Stand'],
+        ['AP 40 CB 6407', 'AP40CB6407', 'Ramesh Kumar', '9876543210', 'TS14DL20190001', 'HYD/PERMIT/2024/001', 'Ameerpet', 'Ameerpet Stand'],
+        ['TS 09 EA 1234', 'TS09EA1234', 'Suresh Reddy', '9845612345', 'TS14DL20200045', 'HYD/PERMIT/2024/002', 'Kukatpally', 'KPHB Colony Stand'],
+        ['TS 09 EB 5678', 'TS09EB5678', 'Mahesh Yadav', '9912378456', 'TS14DL20180023', 'HYD/PERMIT/2024/003', 'Secunderabad', 'Clock Tower Stand'],
+        ['AP 39 UQ 9305', 'AP39UQ9305', 'Venkat Rao', '9900087654', 'TS14DL20210067', 'HYD/PERMIT/2024/004', 'Hitech City', 'Cyber Tower Stand'],
+        ['AP 31 TF 2581', 'AP31TF2581', 'Naresh Sharma', '9988776655', 'TS14DL20220012', 'HYD/PERMIT/2024/005', 'LB Nagar', 'LB Nagar Stand'],
     ];
     
     foreach ($samples as $row) {
@@ -349,8 +349,8 @@ $csrf_token = generateCSRFToken();
               <tr style="border-bottom: 1px solid #30363d; background: rgba(255,107,107,0.05);">
                 <td style="padding: 12px;"><strong>Auto Number</strong></td>
                 <td style="padding: 12px;">✅ MUST HAVE</td>
-                <td style="padding: 12px;">Alphanumeric, 3-20 chars</td>
-                <td style="padding: 12px;"><code>AUTO-001</code></td>
+                <td style="padding: 12px;">Indian registration format</td>
+                <td style="padding: 12px;"><code>AP 40 CB 6407</code> or <code>AP40CB6407</code></td>
               </tr>
               <tr style="border-bottom: 1px solid #30363d; background: rgba(255,107,107,0.05);">
                 <td style="padding: 12px;"><strong>Driver Name</strong></td>
