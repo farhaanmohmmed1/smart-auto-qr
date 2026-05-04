@@ -15,17 +15,18 @@ class ImportHandler {
     private $adminId;
     private $errors = [];
     private $results = [];
+    private $headerMapping = [];  // Dynamic column mapping from file header
     
-    // Column mapping configuration
-    private $columnMap = [
-        'auto_number'    => ['col' => 0, 'required' => true, 'transform' => 'uppercase'],
-        'reg_number'     => ['col' => 1, 'required' => true, 'transform' => 'uppercase'],
-        'driver_name'    => ['col' => 2, 'required' => true, 'transform' => 'trim'],
-        'phone'          => ['col' => 3, 'required' => true, 'transform' => 'phone'],
-        'license_number' => ['col' => 4, 'required' => true, 'transform' => 'uppercase'],
-        'permit_number'  => ['col' => 5, 'required' => true, 'transform' => 'uppercase'],
-        'area'           => ['col' => 6, 'required' => false, 'transform' => 'trim'],
-        'stand'          => ['col' => 7, 'required' => false, 'transform' => 'trim'],
+    // Column definition configuration
+    private $columnDefinitions = [
+        'auto_number'    => ['required' => true, 'transform' => 'uppercase', 'aliases' => ['Auto Number', 'Auto#', 'Auto No']],
+        'reg_number'     => ['required' => false, 'transform' => 'uppercase', 'aliases' => ['Registration Number', 'Reg Number', 'Reg#', 'Vehicle Reg']],
+        'driver_name'    => ['required' => true, 'transform' => 'trim', 'aliases' => ['Driver Name', 'Driver', 'Driver\'s Name', 'Auto Owner', 'Auto Owner Name', 'Owner Name', 'Owner']],
+        'phone'          => ['required' => false, 'transform' => 'phone', 'aliases' => ['Phone Number', 'Phone', 'Mobile', 'Contact']],
+        'license_number' => ['required' => false, 'transform' => 'uppercase', 'aliases' => ['License Number', 'License#', 'DL', 'License']],
+        'permit_number'  => ['required' => false, 'transform' => 'uppercase', 'aliases' => ['Permit Number', 'Permit#', 'Permit']],
+        'area'           => ['required' => false, 'transform' => 'trim', 'aliases' => ['Area', 'Zone', 'Operating Area']],
+        'stand'          => ['required' => false, 'transform' => 'trim', 'aliases' => ['Stand', 'Stand Name', 'Depot', 'Stand Depot']],
     ];
     
     public function __construct($pdo, int $adminId) {
@@ -61,19 +62,28 @@ class ImportHandler {
             return $this->error('File too large. Maximum 50MB allowed.');
         }
         
-        // Parse file
+        // Parse file with headers
         try {
             if (in_array($importType, ['xlsx', 'xls'])) {
-                $rows = $this->parseExcel($tmpPath, $importType);
+                $result = $this->parseExcel($tmpPath, $importType);
             } else {
-                $rows = $this->parseCSV($tmpPath);
+                $result = $this->parseCSV($tmpPath);
             }
+            
+            $headers = $result['headers'] ?? [];
+            $rows = $result['rows'] ?? [];
         } catch (Exception $e) {
             return $this->error('File parsing error: ' . $e->getMessage());
         }
         
         if (empty($rows)) {
             return $this->error('No data rows found in file (ensure first row is header).');
+        }
+        
+        // Build header mapping from file columns
+        $headerValidation = $this->buildHeaderMapping($headers);
+        if (!$headerValidation['valid']) {
+            return $this->error($headerValidation['error']);
         }
         
         // Process rows
@@ -91,26 +101,93 @@ class ImportHandler {
             'skipped' => $processed['skipped'],
             'errors' => $processed['error_count'],
             'details' => $this->results,
+            'detected_columns' => $this->headerMapping,  // Show which columns were detected
             'message' => $this->formatSummary($processed),
         ];
     }
     
     /**
+     * Build mapping between file columns and database fields
+     * Handles flexible column order and missing optional columns
+     */
+    private function buildHeaderMapping(array $headers): array {
+        $this->headerMapping = [];
+        $requiredFields = [];
+        
+        // Get list of required fields
+        foreach ($this->columnDefinitions as $fieldName => $config) {
+            if ($config['required']) {
+                $requiredFields[] = $fieldName;
+            }
+        }
+        
+        // Map each file column to a field
+        foreach ($headers as $colIndex => $headerValue) {
+            $headerNormalized = $this->normalizeHeader($headerValue);
+            $matchedField = null;
+            
+            // Find matching field by aliases
+            foreach ($this->columnDefinitions as $fieldName => $config) {
+                $aliasesNormalized = array_map([$this, 'normalizeHeader'], $config['aliases']);
+                if (in_array($headerNormalized, $aliasesNormalized) || $headerNormalized === $this->normalizeHeader($fieldName)) {
+                    $matchedField = $fieldName;
+                    break;
+                }
+            }
+            
+            if ($matchedField) {
+                $this->headerMapping[$matchedField] = $colIndex;
+            }
+        }
+        
+        // Check if all required fields are found
+        $missingRequired = [];
+        foreach ($requiredFields as $fieldName) {
+            if (!isset($this->headerMapping[$fieldName])) {
+                $missingRequired[] = $fieldName;
+            }
+        }
+        
+        if (!empty($missingRequired)) {
+            return [
+                'valid' => false,
+                'error' => 'Missing required columns: ' . implode(', ', $missingRequired)
+            ];
+        }
+        
+        return ['valid' => true];
+    }
+    
+    /**
+     * Normalize header text for comparison
+     */
+    private function normalizeHeader(string $header): string {
+        return strtolower(trim(preg_replace('/[\s\-_#]+/', '', $header)));
+    }
+    
+    /**
      * Parse Excel file (.xlsx or .xls)
-     * Requires PhpSpreadsheet library
+     * Returns array with headers and rows
      */
     private function parseExcel(string $filePath, string $type): array {
         // Check if PhpSpreadsheet is available
         if (!class_exists('PhpOffice\PhpSpreadsheet\IOFactory')) {
-            throw new Exception('PhpSpreadsheet library not installed. Install via composer require phpoffice/phpspreadsheet');
+            throw new Exception(
+                'Excel (.xlsx/.xls) support requires PhpSpreadsheet library. ' .
+                'Please use CSV format instead, or contact your administrator to install the library. ' .
+                'To install: Run "composer require phpoffice/phpspreadsheet" in your project directory.'
+            );
         }
         
         try {
             $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($filePath);
             $worksheet = $spreadsheet->getActiveSheet();
-            $rows = [];
             
-            foreach ($worksheet->getRowIterator(2) as $row) {  // Start from row 2 (skip header)
+            $headers = [];
+            $rows = [];
+            $isFirstRow = true;
+            
+            foreach ($worksheet->getRowIterator() as $row) {
                 $cellIterator = $row->getCellIterator();
                 $cellIterator->setIterateOnlyExistingCells(false);
                 
@@ -120,12 +197,23 @@ class ImportHandler {
                 }
                 
                 // Skip empty rows
-                if (!empty(array_filter($rowData))) {
+                if (empty(array_filter($rowData))) {
+                    continue;
+                }
+                
+                // First non-empty row is header
+                if ($isFirstRow) {
+                    $headers = $rowData;
+                    $isFirstRow = false;
+                } else {
                     $rows[] = $rowData;
                 }
             }
             
-            return $rows;
+            return [
+                'headers' => $headers,
+                'rows' => $rows,
+            ];
         } catch (Exception $e) {
             throw new Exception('Excel parsing failed: ' . $e->getMessage());
         }
@@ -133,10 +221,12 @@ class ImportHandler {
     
     /**
      * Parse CSV file
-     * Uses standard fgetcsv
+     * Returns array with headers and rows
      */
     private function parseCSV(string $filePath): array {
         $rows = [];
+        $headers = [];
+        $isFirstRow = true;
         
         if (!is_readable($filePath)) {
             throw new Exception('Cannot read file');
@@ -146,13 +236,25 @@ class ImportHandler {
         
         while (($row = fgetcsv($handle, 0, ',')) !== false) {
             // Skip empty rows
-            if (!empty(array_filter($row))) {
+            if (empty(array_filter($row))) {
+                continue;
+            }
+            
+            // First non-empty row is header
+            if ($isFirstRow) {
+                $headers = $row;
+                $isFirstRow = false;
+            } else {
                 $rows[] = $row;
             }
         }
         
         fclose($handle);
-        return $rows;
+        
+        return [
+            'headers' => $headers,
+            'rows' => $rows,
+        ];
     }
     
     /**
@@ -207,13 +309,18 @@ class ImportHandler {
     private function validateAndInsertRow(array $rowData, int $lineNum): array {
         $result = ['row' => $lineNum, 'auto' => ''];
         
-        // Extract fields
+        // Extract fields based on header mapping
         $fields = [];
-        foreach ($this->columnMap as $fieldName => $config) {
-            $colIdx = $config['col'];
-            $value = isset($rowData[$colIdx]) ? trim($rowData[$colIdx]) : '';
+        foreach ($this->columnDefinitions as $fieldName => $config) {
+            $value = '';
             
-            // Transform value
+            // Get value from row if column exists in file
+            if (isset($this->headerMapping[$fieldName])) {
+                $colIdx = $this->headerMapping[$fieldName];
+                $value = isset($rowData[$colIdx]) ? trim($rowData[$colIdx]) : '';
+            }
+            
+            // Transform value if not empty
             if ($value) {
                 $value = $this->transformValue($value, $config['transform']);
             }
@@ -226,7 +333,8 @@ class ImportHandler {
                 ]);
             }
             
-            $fields[$fieldName] = $value;
+            // Optional fields can be empty/null
+            $fields[$fieldName] = $value ?: null;
         }
         
         $result['auto'] = $fields['auto_number'];
@@ -240,7 +348,7 @@ class ImportHandler {
             ]);
         }
         
-        // Check for duplicates
+        // Check for duplicates (only for unique fields if present)
         $duplicate = $this->checkDuplicate($fields['auto_number'], $fields['license_number']);
         if ($duplicate) {
             return array_merge($result, [
@@ -288,7 +396,7 @@ class ImportHandler {
                 strpos($e->getMessage(), 'Duplicate') !== false) {
                 return array_merge($result, [
                     'status' => 'skip',
-                    'message' => 'Duplicate entry (auto_number or license_number already exists)',
+                    'message' => 'Duplicate entry (auto_number already exists)',
                 ]);
             }
             
@@ -319,8 +427,8 @@ class ImportHandler {
      * Validate field values
      */
     private function validateFields(array $fields): array {
-        // Phone validation (10-12 digits)
-        if (!preg_match('/^\d{10,12}$/', $fields['phone'])) {
+        // Phone validation (only if provided)
+        if ($fields['phone'] && !preg_match('/^\d{10,12}$/', $fields['phone'])) {
             return ['valid' => false, 'error' => 'Invalid phone number (10-12 digits required)'];
         }
         
@@ -340,14 +448,31 @@ class ImportHandler {
     /**
      * Check for duplicate auto
      */
-    private function checkDuplicate(string $autoNumber, string $licenseNumber): bool {
+    private function checkDuplicate(string $autoNumber, ?string $licenseNumber): bool {
+        // Always check auto_number (it's unique and required)
         $stmt = $this->pdo->prepare("
             SELECT id FROM autos 
-            WHERE auto_number = ? OR license_number = ? 
+            WHERE auto_number = ? 
             LIMIT 1
         ");
-        $stmt->execute([$autoNumber, $licenseNumber]);
-        return $stmt->rowCount() > 0;
+        $stmt->execute([$autoNumber]);
+        
+        if ($stmt->rowCount() > 0) {
+            return true;
+        }
+        
+        // Only check license_number if provided
+        if ($licenseNumber) {
+            $stmt = $this->pdo->prepare("
+                SELECT id FROM autos 
+                WHERE license_number = ? 
+                LIMIT 1
+            ");
+            $stmt->execute([$licenseNumber]);
+            return $stmt->rowCount() > 0;
+        }
+        
+        return false;
     }
     
     /**
