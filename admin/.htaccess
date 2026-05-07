@@ -1,0 +1,37 @@
+# ════════════════════════════════════════════════════════════
+# Smart Auto QR - Admin Directory Security
+# ════════════════════════════════════════════════════════════
+
+# Disable directory listing
+Options -Indexes
+
+# Protect sensitive files
+<FilesMatch "\.env|\.git|\.htaccess|config\.php">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Require authentication to access admin directory
+# Allow direct access only to login.php (unprotected)
+<Files "login.php">
+    Order allow,deny
+    Allow from all
+</Files>
+
+# Redirect directory access to login
+DirectoryIndex login.php
+
+# Security headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# Cache control for admin pages
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/html "access 1 minute"
+    ExpiresByType text/css "access 1 day"
+    ExpiresByType application/javascript "access 1 day"
+</IfModule>

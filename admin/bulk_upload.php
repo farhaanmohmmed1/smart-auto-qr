@@ -36,9 +36,9 @@ function downloadTemplate() {
     // Header row
     fputcsv($output, [
         'Auto Number',
-        'Registration Number',
         'Driver Name',
         'Phone Number',
+        'Registration Number',
         'License Number',
         'Permit Number',
         'Area',
@@ -48,11 +48,11 @@ function downloadTemplate() {
     
     // Sample rows
     $samples = [
-        ['AP 40 CB 6407', 'AP40CB6407', 'Ramesh Kumar', '9876543210', 'TS14DL20190001', 'HYD/PERMIT/2024/001', 'Ameerpet', 'Ameerpet Stand', 'safe'],
-        ['TS 09 EA 1234', 'TS09EA1234', 'Suresh Reddy', '9845612345', 'TS14DL20200045', 'HYD/PERMIT/2024/002', 'Kukatpally', 'KPHB Colony Stand', 'safe'],
-        ['TS 09 EB 5678', 'TS09EB5678', 'Mahesh Yadav', '9912378456', 'TS14DL20180023', 'HYD/PERMIT/2024/003', 'Secunderabad', 'Clock Tower Stand', 'caution'],
-        ['AP 39 UQ 9305', 'AP39UQ9305', 'Venkat Rao', '9900087654', 'TS14DL20210067', 'HYD/PERMIT/2024/004', 'Hitech City', 'Cyber Tower Stand', 'safe'],
-        ['AP 31 TF 2581', 'AP31TF2581', 'Naresh Sharma', '9988776655', 'TS14DL20220012', 'HYD/PERMIT/2024/005', 'LB Nagar', 'LB Nagar Stand', 'safe'],
+        ['AP 39 TB 5780', 'THONDA LAKSHMI NARASIMHARAO', '9177233696', 'AP39TB5780', '', '', 'Hytech', 'High Tech Bus Stand', 'caution'],
+        ['AP 39 UH 3856', 'DAVULURI PURUSHOTHAMA RAO', '9845612345', 'AP39UH3856', 'TS14DL20200045', 'HYD/PERMIT/2024/002', 'Kukatpally', 'KPHB Colony Stand', 'safe'],
+        ['AP05 TJ 0633', 'ERUSUMALLA VASU', '9912378456', 'AP05TJ0633', 'TS14DL20180023', 'HYD/PERMIT/2024/003', 'Secunderabad', 'Clock Tower Stand', 'safe'],
+        ['AP 39 UQ 9305', 'KOLLI BALAYOGI', '9900087654', 'AP39UQ9305', 'TS14DL20210067', 'HYD/PERMIT/2024/004', 'Hitech City', 'Cyber Tower Stand', 'safe'],
+        ['AP 31 TF 2581', 'Neeli Veera Venkata Satyanarayana', '9988776655', 'AP31TF2581', 'TS14DL20220012', 'HYD/PERMIT/2024/005', 'LB Nagar', 'LB Nagar Stand', 'safe'],
     ];
     
     foreach ($samples as $row) {
@@ -108,39 +108,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Get CSRF token for form
-// ── Handle schema migration ───────────────────────────────
-if (isset($_POST['fix_schema'])) {
-    if (!validateCSRFToken($_POST['csrf_token'] ?? '')) {
-        $error = 'CSRF token invalid. Please try again.';
-    } else {
-        try {
-            $updates = [
-                "ALTER TABLE autos MODIFY COLUMN reg_number VARCHAR(30) DEFAULT ''",
-                "ALTER TABLE autos MODIFY COLUMN phone VARCHAR(15) DEFAULT ''",
-                "ALTER TABLE autos MODIFY COLUMN license_number VARCHAR(50) DEFAULT ''",
-                "ALTER TABLE autos MODIFY COLUMN permit_number VARCHAR(50) DEFAULT ''",
-                "ALTER TABLE autos MODIFY COLUMN area VARCHAR(100) DEFAULT ''",
-                "ALTER TABLE autos MODIFY COLUMN stand VARCHAR(100) DEFAULT ''",
-            ];
-            
-            // Check if security_detail column exists
-            $checkColumn = $pdo->query("SHOW COLUMNS FROM autos WHERE Field = 'security_detail'");
-            if ($checkColumn->rowCount() === 0) {
-                // Add security_detail column if it doesn't exist
-                $updates[] = "ALTER TABLE autos ADD COLUMN security_detail ENUM('safe','caution','danger') DEFAULT 'safe' AFTER stand";
-            }
-            
-            foreach ($updates as $sql) {
-                $pdo->exec($sql);
-            }
-            
-            $success = "✅ Database schema updated successfully! Optional fields and security detail are now configured.";
-        } catch (Exception $e) {
-            $error = "Schema update error: " . $e->getMessage();
-        }
-    }
-}
-
 $csrf_token = generateCSRFToken();
 
 ?>
@@ -150,130 +117,112 @@ $csrf_token = generateCSRFToken();
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Bulk Upload | <?= APP_NAME ?></title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/admin.css">
   <style>
-    .upload-section {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 30px;
-      margin-bottom: 30px;
-    }
-    
-    @media (max-width: 768px) {
-      .upload-section { grid-template-columns: 1fr; }
-    }
-    
     .upload-box {
-      border: 2px dashed #3949ab;
-      border-radius: 12px;
-      padding: 30px;
+      border: 2px dashed #0d47a1;
+      padding: 40px;
       text-align: center;
-      background: rgba(57,73,171,0.05);
+      background-color: #f9f9f9;
       cursor: pointer;
-      transition: all 0.3s;
+      border-radius: 5px;
+      margin: 20px 0;
     }
-    
-    .upload-box:hover {
-      border-color: #1a237e;
-      background: rgba(26,35,126,0.1);
-      transform: translateY(-2px);
-    }
-    
-    .upload-box.dragover {
-      border-color: #d32f2f;
-      background: rgba(211,47,47,0.1);
-    }
-    
+
     .upload-icon {
-      font-size: 40px;
+      font-size: 48px;
       margin-bottom: 15px;
     }
-    
+
     .upload-box h3 {
-      margin: 15px 0;
-      font-size: 1.1rem;
-    }
-    
-    .upload-box p {
-      color: #7d8590;
-      font-size: 0.9rem;
       margin: 10px 0;
+      font-size: 1.2rem;
+      color: #0d47a1;
     }
-    
-    .form-hint {
-      background: rgba(33,150,243,0.1);
-      border-left: 3px solid #2196F3;
-      padding: 12px;
-      border-radius: 4px;
-      margin: 15px 0;
+
+    .upload-box p {
+      color: #666;
+      margin: 5px 0;
       font-size: 0.9rem;
-      color: #1976D2;
     }
-    
+
     .results-table {
       margin-top: 20px;
       overflow-x: auto;
     }
-    
+
     .results-table table {
       width: 100%;
       border-collapse: collapse;
+      background: white;
     }
-    
+
     .results-table th {
-      background: #161b22;
+      background-color: #0d47a1;
+      color: white;
       padding: 12px;
       text-align: left;
       font-weight: 600;
-      border-bottom: 2px solid #30363d;
     }
-    
+
     .results-table td {
       padding: 10px 12px;
-      border-bottom: 1px solid #30363d;
+      border-bottom: 1px solid #e0e0e0;
     }
-    
+
     .status-badge {
       display: inline-block;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 0.85rem;
+      padding: 5px 10px;
+      border-radius: 3px;
+      font-size: 0.75rem;
       font-weight: 600;
     }
-    
-    .status-success { background: #238636; color: white; }
-    .status-skip { background: #9e6a03; color: white; }
-    .status-error { background: #da3633; color: white; }
-    
-    .summary-card {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 15px;
-      margin-bottom: 25px;
+
+    .status-success {
+      background-color: #c8e6c9;
+      color: #2e7d32;
     }
-    
-    @media (max-width: 768px) {
-      .summary-card { grid-template-columns: repeat(2, 1fr); }
+
+    .status-error {
+      background-color: #ffcdd2;
+      color: #c41c3b;
     }
-    
+
     .summary-stat {
-      background: #161b22;
-      border: 1px solid #30363d;
+      background-color: white;
+      border: 1px solid #ddd;
       padding: 20px;
-      border-radius: 8px;
+      border-radius: 5px;
       text-align: center;
     }
-    
+
     .summary-stat .number {
       font-size: 2rem;
       font-weight: 700;
+      color: #0d47a1;
       margin-bottom: 5px;
     }
-    
+
     .summary-stat .label {
-      font-size: 0.9rem;
-      color: #7d8590;
+      font-size: 0.85rem;
+      color: #666;
+      font-weight: 600;
+    }
+
+    .tab-btn {
+      padding: 10px 15px;
+      background: none;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      font-weight: 600;
+      border-bottom: 3px solid transparent;
+      margin-right: 5px;
+    }
+
+    .tab-btn.active {
+      color: #0d47a1;
+      border-bottom-color: #0d47a1;
     }
   </style>
 </head>
@@ -307,18 +256,6 @@ $csrf_token = generateCSRFToken();
       </div>
     <?php endif; ?>
 
-    <!-- Database Schema Fix (if needed) -->
-    <div style="margin-bottom: 20px;">
-      <form method="POST" style="display: inline;">
-        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken()) ?>">
-        <button type="submit" name="fix_schema" value="1" class="btn btn-secondary" style="font-size: 0.85rem; padding: 8px 12px;">
-          🔧 Fix Database Schema (if imports are failing)
-        </button>
-      </form>
-      <p style="font-size: 0.8rem; color: #8b949e; margin-top: 5px;">
-        Click this if you see "Integrity constraint violation" errors during import.
-      </p>
-    </div>
 
     <!-- Upload Zone -->
     <div class="card">
@@ -330,152 +267,89 @@ $csrf_token = generateCSRFToken();
           <!-- CSRF Token -->
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken()) ?>">
           
-          <div class="upload-section">
-            <!-- Unified Upload -->
-            <div class="upload-box" id="uploadBox" onclick="document.getElementById('fileInput').click()" style="grid-column: 1 / -1;">
-              <div class="upload-icon">📊</div>
-              <h3>Import Auto Data</h3>
-              <p>.csv (Recommended) | .xlsx, .xls</p>
-              <p style="font-size: 0.8rem; color: #8b949e; margin-top: 10px;">Click to browse or drag & drop</p>
-              <input type="file" id="fileInput" name="import_file" accept=".xlsx,.xls,.csv,.txt" style="display:none">
-            </div>
+          <div class="upload-box" id="uploadBox" onclick="document.getElementById('fileInput').click()">
+            <div class="upload-icon">📊</div>
+            <h3>Select File to Import</h3>
+            <p>.csv (Recommended) | .xlsx, .xls</p>
+            <p style="font-size: 0.85rem; color: #999; margin-top: 8px;">Click to browse or drag & drop</p>
+            <input type="file" id="fileInput" name="import_file" accept=".xlsx,.xls,.csv,.txt" style="display:none">
           </div>
 
           <div class="form-hint">
-            💡 <strong>Tip:</strong> The first row should be headers. Maximum file size: 50MB. 
-            Each file can contain 1,000–100,000 records. <strong>CSV format is recommended and works out of the box.</strong>
+            💡 <strong>Tip:</strong> First row should be headers. Max 50MB. CSV format recommended and works out of the box.
           </div>
 
-          <div style="padding: 12px; background: rgba(255,193,7,0.1); border-left: 3px solid #FFC107; border-radius: 4px; margin: 15px 0; font-size: 0.9rem;">
-            <strong>📝 Using CSV Format:</strong> The easiest way is to export your Excel file as CSV. 
-            Most spreadsheet apps support this: File → Export as → CSV.
+          <div class="info-yellow">
+            <strong>📝 Using CSV Format:</strong> Export your Excel file as CSV. File → Export as → CSV.
           </div>
 
-          <div style="padding: 12px; background: rgba(33,150,243,0.1); border-left: 3px solid #2196F3; border-radius: 4px; margin: 15px 0; font-size: 0.9rem;">
-            <strong>ℹ️ Excel Support:</strong> If you want to upload .xlsx or .xls files directly, 
-            contact your administrator to install Excel support via Composer.
+          <div class="info-blue">
+            <strong>ℹ️ Excel Support:</strong> For .xlsx or .xls files, contact admin to install Excel support.
           </div>
 
-          <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px;">
-            <button type="submit" class="btn btn-primary btn-block" id="submitBtn">
+          <div style="margin-top: 20px;">
+            <button type="submit" class="btn btn-primary btn-block" id="submitBtn" style="padding: 12px 20px; font-size: 1rem; font-weight: 600; border-radius: 5px;">
               📤 Upload & Import
             </button>
-            <div id="fileInfo" style="padding: 12px; background: rgba(33,150,243,0.1); border-left: 3px solid #2196F3; border-radius: 4px; display: none;">
-              <strong>✓ File selected:</strong> <span id="fileName" style="color: #2196F3;"></span>
+            <div id="fileInfo" style="display: none; margin-top: 10px;">
+              <p style="color: #0d47a1; font-weight: 600;"><strong>✓ File selected:</strong> <span id="fileName"></span></p>
             </div>
           </div>
         </form>
       </div>
     </div>
 
-    <!-- Import Guide -->
-    <div class="card" style="margin-top: 25px;">
-      <div class="card-header">
-        <h2 class="card-title">📋 Column Requirements</h2>
-      </div>
-      <div class="card-body">
-        <div style="margin-bottom: 15px; padding: 12px; background: rgba(33,150,243,0.1); border-left: 3px solid #2196F3; border-radius: 4px;">
-          <strong>ℹ️ Flexible Column Mapping:</strong> Your file columns will be automatically detected by headers. Any column order is supported! 
-          Missing optional fields will be left blank in the database.
-        </div>
-        
-        <div style="overflow-x: auto;">
-          <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-              <tr style="background: rgba(255,255,255,0.05);">
-                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #30363d;">Column</th>
-                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #30363d;">Required</th>
-                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #30363d;">Format</th>
-                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #30363d;">Example</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr style="border-bottom: 1px solid #30363d; background: rgba(255,107,107,0.05);">
-                <td style="padding: 12px;"><strong>Auto Number</strong></td>
-                <td style="padding: 12px;">✅ MUST HAVE</td>
-                <td style="padding: 12px;">2-50 characters (any format)</td>
-                <td style="padding: 12px;"><code>AP 40 CB 6407</code>, <code>AUTO-001</code>, etc.</td>
-              </tr>
-              <tr style="border-bottom: 1px solid #30363d; background: rgba(255,107,107,0.05);">
-                <td style="padding: 12px;"><strong>Driver Name</strong></td>
-                <td style="padding: 12px;">✅ MUST HAVE</td>
-                <td style="padding: 12px;">3-100 characters</td>
-                <td style="padding: 12px;"><code>Ramesh Kumar</code></td>
-              </tr>
-              <tr style="border-bottom: 1px solid #30363d;">
-                <td style="padding: 12px;"><strong>Reg Number</strong></td>
-                <td style="padding: 12px;">⚪ Optional*</td>
-                <td style="padding: 12px;">Vehicle registration</td>
-                <td style="padding: 12px;"><code>TS09EA1234</code></td>
-              </tr>
-              <tr style="border-bottom: 1px solid #30363d;">
-                <td style="padding: 12px;"><strong>Phone</strong></td>
-                <td style="padding: 12px;">⚪ Optional*</td>
-                <td style="padding: 12px;">10-12 digits</td>
-                <td style="padding: 12px;"><code>9876543210</code></td>
-              </tr>
-              <tr style="border-bottom: 1px solid #30363d;">
-                <td style="padding: 12px;"><strong>License Number</strong></td>
-                <td style="padding: 12px;">⚪ Optional*</td>
-                <td style="padding: 12px;">Driver license ID</td>
-                <td style="padding: 12px;"><code>TS14DL20190001</code></td>
-              </tr>
-              <tr style="border-bottom: 1px solid #30363d;">
-                <td style="padding: 12px;"><strong>Permit Number</strong></td>
-                <td style="padding: 12px;">⚪ Optional*</td>
-                <td style="padding: 12px;">Operating permit ID</td>
-                <td style="padding: 12px;"><code>HYD/PERMIT/2024/001</code></td>
-              </tr>
-              <tr style="border-bottom: 1px solid #30363d;">
-                <td style="padding: 12px;"><strong>Area</strong></td>
-                <td style="padding: 12px;">⚪ Optional</td>
-                <td style="padding: 12px;">Operating zone/area</td>
-                <td style="padding: 12px;"><code>Ameerpet</code></td>
-              </tr>
-              <tr style="border-bottom: 1px solid #30363d;">
-                <td style="padding: 12px;"><strong>Stand</strong></td>
-                <td style="padding: 12px;">⚪ Optional</td>
-                <td style="padding: 12px;">Auto stand/depot name</td>
-                <td style="padding: 12px;"><code>Ameerpet Stand</code></td>
-              </tr>
-              <tr>
-                <td style="padding: 12px;"><strong>Security</strong></td>
-                <td style="padding: 12px;">⚪ Optional</td>
-                <td style="padding: 12px;">safe, caution, or danger</td>
-                <td style="padding: 12px;"><code>safe</code>, <code>caution</code></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        
-        <div style="margin-top: 15px; padding: 12px; background: rgba(255,193,7,0.1); border-left: 3px solid #FFC107; border-radius: 4px;">
-          <strong>* Note on Optional Fields:</strong> Fields marked as optional will be stored as empty/blank in the database if the column is not present in your file.
-        </div>
-      </div>
-    </div>
+  </div>
+</div>
 
-    <!-- Google Sheets Guide -->
-    <div class="card" style="margin-top: 25px;">
-      <div class="card-header">
-        <h2 class="card-title">📊 How to Use Google Sheets</h2>
-      </div>
-      <div class="card-body">
-        <ol style="line-height: 1.8; margin-left: 20px;">
-          <li><strong>Create your spreadsheet</strong> in Google Sheets with the columns above</li>
-          <li><strong>Add your data</strong> with one auto-rickshaw per row</li>
-          <li><strong>Share the sheet</strong> (not necessary for export)</li>
-          <li><strong>Download as CSV:</strong>
-            <ul>
-              <li>File → Download → Comma Separated Values (.csv)</li>
-            </ul>
-          </li>
-          <li><strong>Upload the CSV file</strong> here using the form above</li>
-        </ol>
-        <div class="form-hint" style="margin-top: 20px;">
-          💡 <strong>Tip:</strong> Copy our sample template into Google Sheets and share with your team for collaborative data entry!
-        </div>
-      </div>
-    </div>
+<script>
+  const fileInput = document.getElementById('fileInput');
+  const submitBtn = document.getElementById('submitBtn');
+  const fileInfo = document.getElementById('fileInfo');
+  const fileName = document.getElementById('fileName');
+  const uploadBox = document.getElementById('uploadBox');
+
+  // Disable submit button initially
+  submitBtn.disabled = true;
+  submitBtn.style.opacity = '0.6';
+
+  // File selection
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+      fileName.textContent = e.target.files[0].name;
+      fileInfo.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.style.opacity = '1';
+    }
+  });
+
+  // Drag & drop
+  uploadBox.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadBox.style.backgroundColor = '#f0f4ff';
+  });
+
+  uploadBox.addEventListener('dragleave', () => {
+    uploadBox.style.backgroundColor = '#f9f9f9';
+  });
+
+  uploadBox.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadBox.style.backgroundColor = '#f9f9f9';
+    
+    if (e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      fileInput.files = dataTransfer.files;
+      
+      fileName.textContent = file.name;
+      fileInfo.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.style.opacity = '1';
+    }
+  });
+</script>
 
     <!-- Import Results -->
     <?php if ($importResults && $importResults['success']): ?>
@@ -487,9 +361,9 @@ $csrf_token = generateCSRFToken();
           
           <!-- Detected Columns Info -->
           <?php if (!empty($importResults['detected_columns'])): ?>
-            <div style="padding: 12px; background: rgba(33,150,243,0.1); border-left: 3px solid #2196F3; border-radius: 4px; margin-bottom: 20px;">
+            <div class="info-blue" style="margin-bottom: 24px;">
               <strong>📋 Detected Columns:</strong>
-              <ul style="margin: 8px 0 0 20px; font-size: 0.9rem;">
+              <ul style="margin: 10px 0 0 20px; font-size: 0.9rem; font-weight: 500;">
                 <?php foreach ($importResults['detected_columns'] as $fieldName => $colIndex): ?>
                   <li><?= ucwords(str_replace('_', ' ', htmlspecialchars($fieldName))) ?> (Column <?= $colIndex + 1 ?>)</li>
                 <?php endforeach; ?>
@@ -498,8 +372,8 @@ $csrf_token = generateCSRFToken();
           <?php endif; ?>
           
           <!-- Summary Statement -->
-          <div style="padding: 15px; background: rgba(45,194,107,0.1); border-left: 4px solid #2dc26b; border-radius: 6px; margin-bottom: 25px;">
-            <p style="margin: 0; font-size: 1.05rem; line-height: 1.6;">
+          <div class="info-success" style="margin-bottom: 28px; padding: 18px 20px; font-size: 1.05rem;">
+            <p style="margin: 0; line-height: 1.7;">
               <strong>✅ Import Summary:</strong><br>
               <?php
                 $total = $importResults['total'] ?? 0;
@@ -538,17 +412,17 @@ $csrf_token = generateCSRFToken();
           </div>
 
           <!-- Tabbed Results Section -->
-          <div style="margin-top: 30px;">
-            <div style="display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 2px solid #30363d; flex-wrap: wrap;">
-              <button class="tab-btn active" data-tab="all" style="padding: 12px 20px; background: none; border: none; color: #c9d1d9; cursor: pointer; font-weight: 600; border-bottom: 3px solid #2196F3; margin-bottom: -2px; transition: all 0.3s;">
+          <div style="margin-top: 32px;">
+            <div style="display: flex; gap: 12px; margin-bottom: 20px; border-bottom: 2px solid var(--border-light); flex-wrap: wrap;">
+              <button class="tab-btn active" data-tab="all" style="border-bottom-color: var(--accent);">
                 📊 All Records (<?= $importResults['total'] ?? 0 ?>)
               </button>
-              <button class="tab-btn" data-tab="success" style="padding: 12px 20px; background: none; border: none; color: #8b949e; cursor: pointer; font-weight: 600; transition: all 0.3s;">
+              <button class="tab-btn" data-tab="success">
                 ✅ Added (<?= $importResults['successful'] ?? 0 ?>)
               </button>
 
               <?php if (($importResults['error_count'] ?? 0) > 0): ?>
-                <button class="tab-btn" data-tab="errors" style="padding: 12px 20px; background: none; border: none; color: #8b949e; cursor: pointer; font-weight: 600; transition: all 0.3s;">
+                <button class="tab-btn" data-tab="errors">
                   ❌ Errors (<?= $importResults['error_count'] ?? 0 ?>)
                 </button>
               <?php endif; ?>
@@ -580,7 +454,7 @@ $csrf_token = generateCSRFToken();
                               ?>
                             </span>
                           </td>
-                          <td style="font-size: 0.9rem;"><?= htmlspecialchars($detail['message']) ?></td>
+                          <td style="font-size: 0.9rem; color: var(--text-muted);font-weight: 500;"><?= htmlspecialchars($detail['message']) ?></td>
                         </tr>
                       <?php endforeach; ?>
                     </tbody>

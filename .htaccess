@@ -13,6 +13,13 @@ ServerSignature Off
     RewriteCond %{HTTPS} off
     RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1) [NC]
     RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+    
+    # ── Hide Admin Directory ──────────────────────────────────
+    # Redirect /admin or /admin/ to /admin/login.php (hides structure)
+    # Direct file access still works, but directory listing is prevented
+    RewriteCond %{REQUEST_URI} ^/admin/?$ [OR]
+    RewriteCond %{REQUEST_URI} ^/admin/$ 
+    RewriteRule ^admin/?$ admin/login.php [L]
 </IfModule>
 
 # ── Security Headers ──────────────────────────────────────────
